@@ -42,32 +42,47 @@ This puts the `librarian` console script on your PATH and pulls in `pyzotero`,
 
 ## Setup
 
-1. **Zotero** — create a Web API key (write access; group-read if you migrate
-   from a group) and note your numeric user id at
-   <https://www.zotero.org/settings/keys>. Enable Zotero sync.
+The fastest path is the **guided setup** — it collects your credentials, saves
+them, scaffolds the wiki, optionally logs into Scholar Inbox, and runs a health
+check, all in one go:
 
-   ```bash
-   librarian config --vault ~/path/to/your-vault \
-       --zotero-library-id 1234567 --zotero-api-key XXXX
-   ```
+```bash
+librarian setup
+```
 
-2. **Scholar Inbox** (optional) — log in once with a magic link:
+It prompts for:
 
-   ```bash
-   librarian login-scholar "https://www.scholar-inbox.com/...&sha_key=..."
-   ```
+- **Obsidian vault root** (defaults to the current directory).
+- **Zotero library id** (your numeric user id) and **API key** (entered hidden) —
+  create a write-access key and find your id at
+  <https://www.zotero.org/settings/keys>. Enable Zotero sync.
+- **Semantic Scholar API key** (optional — lifts bibtex-updater rate limits).
+- **Scholar Inbox magic-link URL** (optional — paste the link from your login
+  email to log in once).
 
-3. **Scaffold the wiki** inside your vault and install the Claude Code skills:
+You can also pass any of these as flags (`--vault`, `--zotero-library-id`,
+`--zotero-api-key`, `--zotero-library-type`, `--s2-api-key`, `--scholar-link`) and
+add `--non-interactive` to skip all prompts (handy for scripted/CI setup).
 
-   ```bash
-   librarian init ~/path/to/your-vault
-   ```
+Scaffolding creates `research/` (the wiki), a root `CLAUDE.md` schema, and installs
+the `paper-ingest` / `paper-query` / `paper-lint` skills + four subagents into the
+vault's `.claude/`. Your existing `notes/` are never touched.
 
-   This creates `research/` (the wiki), a root `CLAUDE.md` schema, and installs
-   the `paper-ingest` / `paper-query` / `paper-lint` skills + four subagents into
-   the vault's `.claude/`. Your existing `notes/` are never touched.
+### Manual setup (equivalent)
 
-4. **Verify:** `librarian doctor`
+If you'd rather set each piece yourself:
+
+```bash
+librarian config --vault ~/path/to/your-vault \
+    --zotero-library-id 1234567 --zotero-api-key XXXX   # credentials + vault path
+librarian login-scholar "https://www.scholar-inbox.com/...&sha_key=..."  # optional
+librarian init ~/path/to/your-vault                     # scaffold wiki + install skills
+librarian doctor                                        # verify everything
+```
+
+Environment variables override the config file (`ZOTERO_API_KEY`,
+`ZOTERO_LIBRARY_ID`, `ZOTERO_LIBRARY_TYPE`, `S2_API_KEY`, `LIBRARIAN_VAULT`), so
+the same setup works headless / in CI.
 
 ## Daily use (in Claude Code, inside the vault)
 
@@ -97,7 +112,7 @@ the wiki. Then `librarian clean` (dry-run first) cleans metadata library-wide.
 
 | Group | Commands |
 |---|---|
-| Sourcing & Zotero | `config` · `login-scholar` · `doctor` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
+| Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
 | Wiki engine | `init` · `fetch` · `assemble-paper` · `assemble-finding` · `scan` · `citation-match` · `apply-edges` · `create-stubs` · `lint` · `log` · `paths` |
 
 Run `librarian <command> -h` for details.

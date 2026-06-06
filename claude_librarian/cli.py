@@ -4,6 +4,7 @@
 Two families of subcommands:
 
   Sourcing & Zotero hygiene (talk to Zotero / Scholar Inbox):
+    setup           guided onboarding: keys + vault + scaffold + doctor
     config          set/show credentials and the vault path
     login-scholar   one-time Scholar Inbox magic-link login
     doctor          verify credentials, session, and vault
@@ -50,6 +51,72 @@ def _print_usage() -> int:
 # --------------------------------------------------------------------------
 # Sourcing & Zotero hygiene
 # --------------------------------------------------------------------------
+
+def cmd_setup(argv: list[str]) -> int:
+    """Guided onboarding: collect credentials + vault path, save config, scaffold
+    the wiki, optionally log into Scholar Inbox, then run doctor. Prompts for any
+    value not passed as a flag (unless --non-interactive)."""
+    import getpass
+    from . import config, init_vault
+    ap = argparse.ArgumentParser(prog="librarian setup")
+    ap.add_argument("--vault", default=None)
+    ap.add_argument("--zotero-library-id", dest="zid", default=None)
+    ap.add_argument("--zotero-api-key", dest="zkey", default=None)
+    ap.add_argument("--zotero-library-type", dest="ztype", default=None, choices=["user", "group"])
+    ap.add_argument("--s2-api-key", dest="s2", default=None)
+    ap.add_argument("--scholar-link", dest="scholar", default=None, help="Scholar Inbox magic-link URL")
+    ap.add_argument("--non-interactive", action="store_true", help="never prompt; use flags + defaults only")
+    args = ap.parse_args(argv)
+
+    interactive = not args.non_interactive
+
+    def ask(prompt: str, default: str | None = None, secret: bool = False) -> str | None:
+        if not interactive:
+            return default
+        suffix = f" [{default}]" if default else ""
+        if secret:
+            val = getpass.getpass(f"{prompt}{suffix}: ").strip()
+        else:
+            val = input(f"{prompt}{suffix}: ").strip()
+        return val or default
+
+    print("claude-librarian setup")
+    print("─" * 40)
+    print("Get your Zotero numeric user id + a write API key at "
+          "https://www.zotero.org/settings/keys\n")
+
+    cfg = config.load()
+    import os as _os
+    default_vault = args.vault or cfg.get("vault_path") or _os.getcwd()
+    vault = ask("Obsidian vault root", default=default_vault) or default_vault
+    zid = args.zid or ask("Zotero library id (numeric user id)", default=cfg.get("zotero_library_id"))
+    zkey = args.zkey or ask("Zotero API key", secret=True) or cfg.get("zotero_api_key")
+    ztype = args.ztype or ask("Zotero library type (user/group)", default=cfg.get("zotero_library_type") or "user")
+    s2 = args.s2 or ask("Semantic Scholar API key (optional, Enter to skip)", default=cfg.get("s2_api_key"))
+    scholar = args.scholar or ask("Scholar Inbox magic-link URL (optional, Enter to skip)")
+
+    for k, v in {"vault_path": vault, "zotero_library_id": zid, "zotero_api_key": zkey,
+                 "zotero_library_type": ztype, "s2_api_key": s2}.items():
+        if v:
+            cfg[k] = v
+    config.save(cfg)
+    print(f"\nSaved config to {config.CONFIG_PATH}")
+
+    print("\nScaffolding the wiki…")
+    init_vault.main([vault])
+
+    if scholar:
+        from .sources import scholar_inbox
+        print("\nLogging into Scholar Inbox…")
+        try:
+            scholar_inbox.login(scholar)
+            print("Scholar Inbox session saved.")
+        except Exception as e:
+            print(f"Scholar Inbox login failed: {e}")
+
+    print()
+    return cmd_doctor(["--vault", vault])
+
 
 def cmd_config(argv: list[str]) -> int:
     from . import config
@@ -366,6 +433,7 @@ def _engine(name: str) -> Callable[[list[str]], int]:
 
 COMMANDS: dict[str, Callable[[list[str]], int]] = {
     # sourcing & hygiene
+    "setup": cmd_setup,
     "config": cmd_config,
     "login-scholar": cmd_login_scholar,
     "doctor": cmd_doctor,
