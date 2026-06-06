@@ -15,7 +15,7 @@ Runs six checks and emits a report. Non-zero exit if any issue is found.
 line to <wiki>/log.md.
 
 Usage:
-    librarian lint <wiki> [--new-slugs a,b] [--since YYYY-MM-DD] [--no-link-similar] [--json]
+    lib lint <wiki> [--new-slugs a,b] [--since YYYY-MM-DD] [--no-link-similar] [--json]
 
 Borrows the design of claude-paperloom's scripts/lint.py (Apache-2.0).
 """
@@ -281,7 +281,7 @@ def check_dates(vault: Path) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian lint", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib lint", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault")
     ap.add_argument("--json", action="store_true", help="emit structured JSON instead of text report")
     ap.add_argument("--new-slugs", default="", help="comma-separated finding slugs to treat as 'new' for dedup")

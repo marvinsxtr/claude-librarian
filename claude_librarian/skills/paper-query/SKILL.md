@@ -9,7 +9,7 @@ description: Answer a question against the research wiki by grepping papers and 
 
 ## Steps
 
-0. Resolve the wiki path: `librarian paths` → use the `wiki` value as `$WIKI`.
+0. Resolve the wiki path: `lib paths` → use the `wiki` value as `$WIKI`.
 
 1. **Plan the search.** Identify likely fields/authors/claim-types from the
    question (e.g. "transformer complexity" → fields `nlp`, `complexity-analysis`).
@@ -33,7 +33,7 @@ description: Answer a question against the research wiki by grepping papers and 
 5. **Log.**
 
 ```bash
-librarian log "$WIKI" query "<one-line question>" "cited <n> files"
+lib log "$WIKI" query "<one-line question>" "cited <n> files"
 ```
 
 ## Guardrails

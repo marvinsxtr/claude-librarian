@@ -9,7 +9,7 @@ Ingest papers into the research wiki. `$ARGUMENTS` is **optional** — a single
 paper reference (URL / arXiv id / DOI / local PDF path). With no argument, drain
 the Zotero `Inbox` queue.
 
-**Division of labor.** All deterministic work is done by the `librarian` CLI
+**Division of labor.** All deterministic work is done by the `lib` CLI
 (sourcing, Zotero writes, PDF parsing, vault writes, linking, logging). The LLM
 is used only for four semantic subagents per paper: `lite-drafter`,
 `finding-extractor`, `metadata-extractor`, `finding-linker`. **Never loop an
@@ -22,7 +22,7 @@ Print: `📖 Ingesting — this may take a moment. Grab a coffee ☕️`
 Resolve paths once and reuse `$WIKI` everywhere below:
 
 ```bash
-librarian paths        # -> {"vault": "...", "wiki": ".../research"}
+lib paths        # -> {"vault": "...", "wiki": ".../research"}
 ```
 
 ## Step 1 — build the work list
@@ -30,21 +30,21 @@ librarian paths        # -> {"vault": "...", "wiki": ".../research"}
 - **If `$ARGUMENTS` is a paper reference:** the work list is that single ref
   (`zotero_key` unknown — skip the Zotero-side step 6 for it).
 - **Otherwise (drain the queue):**
-  1. `librarian clean` — dry-run preprint upgrade + metadata backfill over the
-     Inbox. Show the preview. If it looks right, run `librarian clean --apply`.
-  2. `librarian inbox --json` — the unprocessed Inbox items. Each record has
+  1. `lib clean` — dry-run preprint upgrade + metadata backfill over the
+     Inbox. Show the preview. If it looks right, run `lib clean --apply`.
+  2. `lib inbox --json` — the unprocessed Inbox items. Each record has
      `title`, `fetch_ref`, `zotero_key`, `authors`. The work list is these
      records; `fetch_ref` is the ingest input.
 
 If the work list is empty, tell the user the queue is empty and stop. (Optionally
-suggest `librarian pull` to fetch the latest Scholar Inbox digest first.)
+suggest `lib pull` to fetch the latest Scholar Inbox digest first.)
 
 ## Step 2 — per paper: fetch + extract
 
 For each work item, run the pipeline below. Process papers one at a time.
 
 ```bash
-librarian fetch "$WIKI" "<fetch_ref>"
+lib fetch "$WIKI" "<fetch_ref>"
 ```
 
 Parse the JSON. **If `already_exists` is true**, print that it's already in the
@@ -55,9 +55,9 @@ and move on. Otherwise keep `full_text_path`, `brief_text_path`,
 Scan the wiki for context (independent reads, run together):
 
 ```bash
-librarian scan fields  "$WIKI"
-librarian scan papers  "$WIKI"
-librarian scan authors "$WIKI"
+lib scan fields  "$WIKI"
+lib scan papers  "$WIKI"
+lib scan authors "$WIKI"
 ```
 
 ## Step 3 — fan out two subagents (one message)
@@ -99,7 +99,7 @@ rm -f /tmp/lib_paper.json /tmp/lib_findings.json /tmp/lib_stubs.json /tmp/lib_ed
 }
 ```
 ```bash
-librarian assemble-paper --input /tmp/lib_paper.json   # -> {"slug": "..."}
+lib assemble-paper --input /tmp/lib_paper.json   # -> {"slug": "..."}
 ```
 
 **5b. In parallel — findings, citations, candidates, stubs.** Write
@@ -107,10 +107,10 @@ librarian assemble-paper --input /tmp/lib_paper.json   # -> {"slug": "..."}
 findings and `fields`) and `/tmp/lib_stubs.json` (`authors` + `fields`). Then:
 
 ```bash
-librarian assemble-finding --input /tmp/lib_findings.json
-librarian citation-match "<full_text_path>" <(librarian scan papers "$WIKI") --own-slug "<slug>"
-librarian scan findings-candidates "$WIKI" --fields <f1,f2> --authors "<A;B>" --exclude-paper "<slug>" --cap 30
-librarian create-stubs --input /tmp/lib_stubs.json
+lib assemble-finding --input /tmp/lib_findings.json
+lib citation-match "<full_text_path>" <(lib scan papers "$WIKI") --own-slug "<slug>"
+lib scan findings-candidates "$WIKI" --fields <f1,f2> --authors "<A;B>" --exclude-paper "<slug>" --cap 30
+lib create-stubs --input /tmp/lib_stubs.json
 ```
 
 Update the paper's `findings:` frontmatter with the new finding slugs (re-run
@@ -127,7 +127,7 @@ new findings (slug + statement + fields) and the candidate list from 5b. Write
   "linker_output": [ { "new_finding": "finding-...", "edges": { "supports": [{"target":"finding-...","why":"..."}], "contradicts": [], "extends": [], "uses": [], "similar-to": [] } } ] }
 ```
 ```bash
-librarian apply-edges --input /tmp/lib_edges.json
+lib apply-edges --input /tmp/lib_edges.json
 ```
 
 Call it even with `"linker_output": []` so `cites` still merge in.
@@ -139,7 +139,7 @@ For a queue item (has `zotero_key`), decide coarse/functional tags (e.g.
 the user is citing it in a manuscript. Then one deterministic call:
 
 ```bash
-librarian zotero-update --key "<zotero_key>" --add-tags "<tag1,tag2>" [--project "<Name>"] --mark-ingested
+lib zotero-update --key "<zotero_key>" --add-tags "<tag1,tag2>" [--project "<Name>"] --mark-ingested
 ```
 
 This tags the item, moves it out of `Inbox`, and marks it `wiki-ingested`.
@@ -152,8 +152,8 @@ This tags the item, moves it out of `Inbox`, and marks it `wiki-ingested`.
 - Log + lint:
 
 ```bash
-librarian log "$WIKI" ingest "<slug>" "<n> findings, <e> edges"
-librarian lint "$WIKI" --new-slugs "<finding-slug-1>,<finding-slug-2>,..."
+lib log "$WIKI" ingest "<slug>" "<n> findings, <e> edges"
+lib lint "$WIKI" --new-slugs "<finding-slug-1>,<finding-slug-2>,..."
 ```
 
 ## Report back

@@ -6,7 +6,7 @@ one place. Borrows the design of claude-paperloom's scripts/_lib.py
 
 Terminology: the *wiki* directory is the LLM-owned root that holds papers/,
 findings/, authors/, fields/, threads/, views/, index.md, log.md. In an
-Obsidian vault scaffolded by `librarian init`, that is `<vault>/research/`.
+Obsidian vault scaffolded by `lib init`, that is `<vault>/research/`.
 """
 
 from __future__ import annotations
@@ -44,9 +44,9 @@ def require_vault(raw: str | os.PathLike[str] | None) -> Path:
     """Resolve and validate the wiki directory (the dir holding papers/, index.md)."""
     vault = resolve_vault(raw)
     if not vault.is_dir():
-        die(f"wiki directory does not exist: {vault} — run `librarian init` first")
+        die(f"wiki directory does not exist: {vault} — run `lib init` first")
     if not (vault / "index.md").is_file():
-        die(f"not a librarian wiki (no index.md): {vault} — run `librarian init` first")
+        die(f"not a lib wiki (no index.md): {vault} — run `lib init` first")
     return vault
 
 

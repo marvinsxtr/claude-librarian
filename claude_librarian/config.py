@@ -12,7 +12,7 @@ the same settings work in headless / CI runs:
 
 Scholar Inbox auth is handled separately by scholarinboxcli, which stores its
 session cookies in ``~/.config/scholarinboxcli/config.json`` after a one-time
-magic-link login (``librarian login-scholar <magic-link-url>``).
+magic-link login (``lib login-scholar <magic-link-url>``).
 
 The Zotero env-var names match what ``bibtex-zotero`` already reads, so the
 cleaning stage needs no extra wiring.
@@ -77,7 +77,7 @@ def zotero_creds(require: bool = True) -> ZoteroCreds | None:
         if require:
             die(
                 "Zotero credentials missing. Set them once with:\n"
-                "    librarian config --zotero-library-id <ID> --zotero-api-key <KEY>\n"
+                "    lib config --zotero-library-id <ID> --zotero-api-key <KEY>\n"
                 "Get both at https://www.zotero.org/settings/keys "
                 "(create a key with write access; your numeric user id is shown there)."
             )
@@ -105,7 +105,7 @@ def vault_path(explicit: str | None = None) -> Path:
     if not raw:
         die(
             "vault path not set. Pass --vault <path>, set LIBRARIAN_VAULT, or run:\n"
-            "    librarian config --vault <path>"
+            "    lib config --vault <path>"
         )
     return Path(os.path.expandvars(os.path.expanduser(str(raw)))).resolve()
 

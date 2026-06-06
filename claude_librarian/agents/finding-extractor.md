@@ -1,6 +1,6 @@
 ---
 name: finding-extractor
-description: Extracts atomic, testable findings from a single research paper. Invoked alongside lite-drafter during /paper-ingest. Returns a JSON array; `librarian assemble-finding` computes slugs and writes files.
+description: Extracts atomic, testable findings from a single research paper. Invoked alongside lite-drafter during /paper-ingest. Returns a JSON array; `lib assemble-finding` computes slugs and writes files.
 tools: Read
 model: haiku
 ---
@@ -52,5 +52,5 @@ A JSON array. Each element:
 
 ## Return format
 
-Return **only** the JSON array. Do not compute slugs — `librarian
+Return **only** the JSON array. Do not compute slugs — `lib
 assemble-finding` does that.

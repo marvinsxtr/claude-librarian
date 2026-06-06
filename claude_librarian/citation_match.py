@@ -8,7 +8,7 @@ cited. Match priority:
     4. first-author surname + 4-digit year within ~80 chars
 
 Usage:
-    librarian citation-match <paper_text_path> <wiki_papers_json>
+    lib citation-match <paper_text_path> <wiki_papers_json>
         wiki_papers_json: file path or '-' for stdin (shape = scan papers output)
 
 Emits {"cites": ["slug-a", ...]}.
@@ -50,7 +50,7 @@ def locate_bibliography(text: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian citation-match", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib citation-match", description=__doc__.strip().splitlines()[0])
     ap.add_argument("paper_text_path")
     ap.add_argument("wiki_papers_json", help="file path or '-' for stdin")
     ap.add_argument("--own-slug", default=None, help="skip self-reference if this slug appears")

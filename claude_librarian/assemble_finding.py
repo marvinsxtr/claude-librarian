@@ -45,7 +45,7 @@ def slug_for_finding(statement: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian assemble-finding", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib assemble-finding", description=__doc__.strip().splitlines()[0])
     ap.add_argument("--input", default="-", help="JSON payload path or '-' for stdin")
     args = ap.parse_args(argv)
 

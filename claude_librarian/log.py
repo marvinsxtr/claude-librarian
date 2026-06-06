@@ -2,10 +2,10 @@
 """Append a line to <wiki>/log.md.
 
 Usage:
-    librarian log <wiki> <action> <target> <note...>
+    lib log <wiki> <action> <target> <note...>
 
 Example:
-    librarian log ~/vault/research ingest 2017-06-attention-is-all-you-need \
+    lib log ~/vault/research ingest 2017-06-attention-is-all-you-need \
         "8 findings, 5 edges"
 """
 
@@ -18,7 +18,7 @@ from ._lib import require_vault, now_stamp
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian log", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib log", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault")
     ap.add_argument("action")
     ap.add_argument("target")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`librarian` — the claude-librarian command line.
+"""`lib` — the claude-librarian command line.
 
 Two families of subcommands:
 
@@ -28,7 +28,7 @@ Two families of subcommands:
     log             append a line to log.md
     paths           print the resolved vault + wiki paths
 
-Run `librarian <command> -h` for command-specific help.
+Run `lib <command> -h` for command-specific help.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ def cmd_setup(argv: list[str]) -> int:
     value not passed as a flag (unless --non-interactive)."""
     import getpass
     from . import config, init_vault
-    ap = argparse.ArgumentParser(prog="librarian setup")
+    ap = argparse.ArgumentParser(prog="lib setup")
     ap.add_argument("--vault", default=None)
     ap.add_argument("--zotero-library-id", dest="zid", default=None)
     ap.add_argument("--zotero-api-key", dest="zkey", default=None)
@@ -120,7 +120,7 @@ def cmd_setup(argv: list[str]) -> int:
 
 def cmd_config(argv: list[str]) -> int:
     from . import config
-    ap = argparse.ArgumentParser(prog="librarian config")
+    ap = argparse.ArgumentParser(prog="lib config")
     ap.add_argument("--vault", help="Obsidian vault root (contains research/ + CLAUDE.md)")
     ap.add_argument("--zotero-library-id", dest="zid")
     ap.add_argument("--zotero-api-key", dest="zkey")
@@ -152,13 +152,13 @@ def cmd_config(argv: list[str]) -> int:
             masked["zotero_api_key"] = masked["zotero_api_key"][:4] + "…(set)"
         if masked.get("s2_api_key"):
             masked["s2_api_key"] = "…(set)"
-        print(json.dumps(masked or {"(empty)": "run `librarian config --help`"}, indent=2))
+        print(json.dumps(masked or {"(empty)": "run `lib config --help`"}, indent=2))
     return 0
 
 
 def cmd_login_scholar(argv: list[str]) -> int:
     from .sources import scholar_inbox
-    ap = argparse.ArgumentParser(prog="librarian login-scholar")
+    ap = argparse.ArgumentParser(prog="lib login-scholar")
     ap.add_argument("magic_link_url", help="the Scholar Inbox magic-link URL from your login email")
     args = ap.parse_args(argv)
     scholar_inbox.login(args.magic_link_url)
@@ -168,7 +168,7 @@ def cmd_login_scholar(argv: list[str]) -> int:
 
 def cmd_doctor(argv: list[str]) -> int:
     from . import config
-    ap = argparse.ArgumentParser(prog="librarian doctor")
+    ap = argparse.ArgumentParser(prog="lib doctor")
     ap.add_argument("--vault", default=None)
     args = ap.parse_args(argv)
 
@@ -178,7 +178,7 @@ def cmd_doctor(argv: list[str]) -> int:
 
     creds = config.zotero_creds(require=False)
     if not creds:
-        print("Zotero      ✗ credentials not set (run `librarian config --zotero-library-id … --zotero-api-key …`)")
+        print("Zotero      ✗ credentials not set (run `lib config --zotero-library-id … --zotero-api-key …`)")
         ok = False
     else:
         try:
@@ -194,7 +194,7 @@ def cmd_doctor(argv: list[str]) -> int:
         if SCHOLAR_CFG.exists():
             print(f"Scholar     ✓ session file present ({SCHOLAR_CFG})")
         else:
-            print("Scholar     ⚠ not logged in (run `librarian login-scholar <magic-link>`) — optional")
+            print("Scholar     ⚠ not logged in (run `lib login-scholar <magic-link>`) — optional")
     except Exception:
         print("Scholar     ⚠ scholarinboxcli not available")
 
@@ -203,10 +203,10 @@ def cmd_doctor(argv: list[str]) -> int:
         if (wiki / "index.md").is_file():
             print(f"Wiki        ✓ {wiki}")
         else:
-            print(f"Wiki        ✗ not initialized at {wiki} (run `librarian init <vault>`)")
+            print(f"Wiki        ✗ not initialized at {wiki} (run `lib init <vault>`)")
             ok = False
     except SystemExit:
-        print("Wiki        ✗ vault path not set (run `librarian config --vault <path>`)")
+        print("Wiki        ✗ vault path not set (run `lib config --vault <path>`)")
         ok = False
 
     print("─" * 40)
@@ -218,7 +218,7 @@ def cmd_pull(argv: list[str]) -> int:
     from . import config
     from .sources import scholar_inbox
     from .zotero import ZoteroLibrary, INBOX_NAME
-    ap = argparse.ArgumentParser(prog="librarian pull")
+    ap = argparse.ArgumentParser(prog="lib pull")
     ap.add_argument("--dry-run", action="store_true", help="list new papers without adding them to Zotero")
     ap.add_argument("--date", default=None, help="digest date (YYYY-MM-DD); default = today")
     ap.add_argument("--json", action="store_true")
@@ -260,7 +260,7 @@ def cmd_pull(argv: list[str]) -> int:
 
 def cmd_inbox(argv: list[str]) -> int:
     from .sources import zotero_inbox
-    ap = argparse.ArgumentParser(prog="librarian inbox")
+    ap = argparse.ArgumentParser(prog="lib inbox")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--all", action="store_true", help="include already-ingested items")
     args = ap.parse_args(argv)
@@ -278,7 +278,7 @@ def cmd_inbox(argv: list[str]) -> int:
 def cmd_clean(argv: list[str]) -> int:
     from . import config, cleaning
     from .zotero import ZoteroLibrary, INBOX_NAME
-    ap = argparse.ArgumentParser(prog="librarian clean")
+    ap = argparse.ArgumentParser(prog="lib clean")
     ap.add_argument("--apply", action="store_true", help="apply changes (default is a --dry-run preview)")
     ap.add_argument("--all", action="store_true", help="clean the whole library (default: just the Inbox)")
     ap.add_argument("--limit", type=int, default=None)
@@ -297,7 +297,7 @@ def cmd_clean(argv: list[str]) -> int:
 def cmd_dedupe(argv: list[str]) -> int:
     from . import config
     from .zotero import ZoteroLibrary
-    ap = argparse.ArgumentParser(prog="librarian dedupe")
+    ap = argparse.ArgumentParser(prog="lib dedupe")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
@@ -321,7 +321,7 @@ def cmd_migrate(argv: list[str]) -> int:
     from .config import ZoteroCreds
     from .zotero import ZoteroLibrary, INBOX_NAME, ARCHIVE_NAME
     from . import init_vault
-    ap = argparse.ArgumentParser(prog="librarian migrate")
+    ap = argparse.ArgumentParser(prog="lib migrate")
     ap.add_argument("--vault", default=None, help="Obsidian vault root (default: configured vault_path)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--archive-existing", action="store_true",
@@ -356,13 +356,13 @@ def cmd_migrate(argv: list[str]) -> int:
     print("\n== Scaffold wiki ==")
     vault = str(config.vault_path(args.vault))
     if args.dry_run:
-        print(f"  would run `librarian init {vault}`")
+        print(f"  would run `lib init {vault}`")
     else:
         init_vault.main([vault])
 
     print("\nNext steps:")
-    print("  1. librarian clean            # dry-run preprint upgrade + metadata backfill on the Inbox")
-    print("  2. librarian clean --apply    # apply it")
+    print("  1. lib clean            # dry-run preprint upgrade + metadata backfill on the Inbox")
+    print("  2. lib clean --apply    # apply it")
     print("  3. /paper-ingest              # ingest the active subset into the wiki")
     return 0
 
@@ -372,7 +372,7 @@ def cmd_zotero_update(argv: list[str]) -> int:
     wiki-ingested — in one call, so the skill never loops an LLM over items."""
     from . import config
     from .zotero import ZoteroLibrary, INBOX_NAME, INGESTED_TAG
-    ap = argparse.ArgumentParser(prog="librarian zotero-update")
+    ap = argparse.ArgumentParser(prog="lib zotero-update")
     ap.add_argument("--key", required=True, help="Zotero item key")
     ap.add_argument("--add-tags", default="", help="comma-separated coarse/functional tags")
     ap.add_argument("--project", default=None, help="move into Projects/<name> (created on demand)")
@@ -411,7 +411,7 @@ def cmd_zotero_update(argv: list[str]) -> int:
 
 def cmd_paths(argv: list[str]) -> int:
     from . import config
-    ap = argparse.ArgumentParser(prog="librarian paths")
+    ap = argparse.ArgumentParser(prog="lib paths")
     ap.add_argument("--vault", default=None)
     args = ap.parse_args(argv)
     vault = config.vault_path(args.vault)

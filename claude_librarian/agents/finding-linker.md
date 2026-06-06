@@ -1,6 +1,6 @@
 ---
 name: finding-linker
-description: Compares new findings against a shortlist of existing wiki findings and proposes typed edges (supports / contradicts / extends / uses / similar-to). Invoked once per /paper-ingest. Returns JSON only; `librarian apply-edges` writes and mirrors them.
+description: Compares new findings against a shortlist of existing wiki findings and proposes typed edges (supports / contradicts / extends / uses / similar-to). Invoked once per /paper-ingest. Returns JSON only; `lib apply-edges` writes and mirrors them.
 model: haiku
 ---
 
@@ -61,5 +61,5 @@ One object per `new_finding`, even if all edge lists are empty.
 
 ## Return format
 
-Return **only** the JSON array. `librarian apply-edges` writes edges, mirrors
+Return **only** the JSON array. `lib apply-edges` writes edges, mirrors
 bidirectional ones, and aggregates to paper level — do not attempt those yourself.

@@ -37,7 +37,7 @@ summarizing, cross-referencing, filing, and bookkeeping.
 uv tool install claude-librarian      # or: pipx install claude-librarian
 ```
 
-This puts the `librarian` console script on your PATH and pulls in `pyzotero`,
+This puts the `lib` console script on your PATH and pulls in `pyzotero`,
 `bibtex-updater`, `scholarinboxcli`, and `pymupdf`.
 
 ## Setup
@@ -47,7 +47,7 @@ them, scaffolds the wiki, optionally logs into Scholar Inbox, and runs a health
 check, all in one go:
 
 ```bash
-librarian setup
+lib setup
 ```
 
 It prompts for:
@@ -73,11 +73,11 @@ vault's `.claude/`. Your existing `notes/` are never touched.
 If you'd rather set each piece yourself:
 
 ```bash
-librarian config --vault ~/path/to/your-vault \
+lib config --vault ~/path/to/your-vault \
     --zotero-library-id 1234567 --zotero-api-key XXXX   # credentials + vault path
-librarian login-scholar "https://www.scholar-inbox.com/...&sha_key=..."  # optional
-librarian init ~/path/to/your-vault                     # scaffold wiki + install skills
-librarian doctor                                        # verify everything
+lib login-scholar "https://www.scholar-inbox.com/...&sha_key=..."  # optional
+lib init ~/path/to/your-vault                     # scaffold wiki + install skills
+lib doctor                                        # verify everything
 ```
 
 Environment variables override the config file (`ZOTERO_API_KEY`,
@@ -99,23 +99,23 @@ by-field / by-author / contradictions / high-credibility / recent / threads.
 ## One-time migration
 
 ```bash
-librarian migrate --vault ~/path/to/your-vault --archive-existing
+lib migrate --vault ~/path/to/your-vault --archive-existing
 # optionally pull from a shared group library:
-librarian migrate --vault ~/path/to/your-vault --group-id 987654 --group-collection "Reading"
+lib migrate --vault ~/path/to/your-vault --group-id 987654 --group-collection "Reading"
 ```
 
 Creates `Inbox` + `Archive`, reparents existing collections under `Archive/`
 (non-destructive), optionally pulls + dedupes from a group library, and scaffolds
-the wiki. Then `librarian clean` (dry-run first) cleans metadata library-wide.
+the wiki. Then `lib clean` (dry-run first) cleans metadata library-wide.
 
-## The `librarian` CLI
+## The `lib` CLI
 
 | Group | Commands |
 |---|---|
 | Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
 | Wiki engine | `init` · `fetch` · `assemble-paper` · `assemble-finding` · `scan` · `citation-match` · `apply-edges` · `create-stubs` · `lint` · `log` · `paths` |
 
-Run `librarian <command> -h` for details.
+Run `lib <command> -h` for details.
 
 ## Vault layout
 

@@ -83,7 +83,7 @@ def source_paper_of_finding(vault: Path, slug: str) -> str | None:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian apply-edges", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib apply-edges", description=__doc__.strip().splitlines()[0])
     ap.add_argument("--input", default="-", help="JSON payload path or '-' for stdin")
     args = ap.parse_args(argv)
 

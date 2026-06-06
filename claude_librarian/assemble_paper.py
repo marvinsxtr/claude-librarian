@@ -64,7 +64,7 @@ def compute_slug(title: str, pub_date: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian assemble-paper", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib assemble-paper", description=__doc__.strip().splitlines()[0])
     ap.add_argument("--input", default="-", help="JSON payload path or '-' for stdin")
     args = ap.parse_args(argv)
 

@@ -1,6 +1,6 @@
 ---
 name: lite-drafter
-description: Produces a short, triage-grade paper summary — Key Takeaways, Background, Main Idea & Summary, Critique. Invoked alongside finding-extractor during /paper-ingest. Returns JSON only; page assembly is done by `librarian assemble-paper`.
+description: Produces a short, triage-grade paper summary — Key Takeaways, Background, Main Idea & Summary, Critique. Invoked alongside finding-extractor during /paper-ingest. Returns JSON only; page assembly is done by `lib assemble-paper`.
 tools: Read
 model: sonnet
 ---

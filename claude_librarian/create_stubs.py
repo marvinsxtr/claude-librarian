@@ -36,7 +36,7 @@ def render(template: str, mapping: dict[str, str]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian create-stubs", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib create-stubs", description=__doc__.strip().splitlines()[0])
     ap.add_argument("--input", default="-")
     args = ap.parse_args(argv)
 

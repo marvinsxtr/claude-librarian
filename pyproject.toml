@@ -30,7 +30,7 @@ Homepage = "https://github.com/marvinsxtr/claude-librarian"
 Repository = "https://github.com/marvinsxtr/claude-librarian"
 
 [project.scripts]
-librarian = "claude_librarian.cli:main"
+lib = "claude_librarian.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["claude_librarian"]

@@ -11,7 +11,7 @@ Subcommands:
                         OR whose source-paper's authors overlap the given sets.
 
 Usage:
-    librarian scan <subcommand> <wiki> [opts]
+    lib scan <subcommand> <wiki> [opts]
 
 Borrows the design of claude-paperloom's scripts/vault_scan.py (Apache-2.0).
 """
@@ -111,7 +111,7 @@ def cmd_findings_all(vault: Path) -> list[dict[str, Any]]:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian scan", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib scan", description=__doc__.strip().splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     for name in ("papers", "fields", "authors", "findings-all"):

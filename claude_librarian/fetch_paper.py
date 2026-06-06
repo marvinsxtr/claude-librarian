@@ -294,7 +294,7 @@ def find_existing_paper(
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian fetch", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib fetch", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault", help="the wiki directory (e.g. <vault>/research)")
     ap.add_argument("input", help="arxiv id / DOI / URL / local PDF path")
     ap.add_argument("--force", action="store_true", help="re-extract even if cached")

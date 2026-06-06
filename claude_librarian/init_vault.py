@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scaffold a librarian wiki inside an Obsidian vault. Idempotent.
+"""Scaffold a lib wiki inside an Obsidian vault. Idempotent.
 
 Given the vault root, creates:
 
@@ -14,7 +14,7 @@ Never overwrites existing files (except it merges "dataview" into an existing
 community-plugins.json). The existing notes/ directory is left untouched.
 
 Usage:
-    librarian init <vault-root>
+    lib init <vault-root>
 
 Borrows the design of claude-paperloom's scripts/init_vault.py (Apache-2.0).
 """
@@ -95,7 +95,7 @@ def seed_obsidian_config(vault: Path) -> tuple[int, int]:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(prog="librarian init", description=__doc__.strip().splitlines()[0])
+    ap = argparse.ArgumentParser(prog="lib init", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault_path", help="Obsidian vault root (~ and env vars expanded)")
     args = ap.parse_args(argv)
 

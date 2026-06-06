@@ -1,6 +1,6 @@
 """Scholar Inbox source adapter — wraps scholarinboxcli.
 
-Auth is a one-time magic-link login (``librarian login-scholar <url>``); the
+Auth is a one-time magic-link login (``lib login-scholar <url>``); the
 session cookies are stored by scholarinboxcli in
 ``~/.config/scholarinboxcli/config.json``.
 

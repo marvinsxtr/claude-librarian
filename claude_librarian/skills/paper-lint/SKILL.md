@@ -6,18 +6,18 @@ description: Health-check the research wiki — orphan pages, frontmatter schema
 # /paper-lint
 
 Read-only health check of the wiki (it only ever writes `similar-to` edges
-between detected duplicates). All six checks run in `librarian lint`.
+between detected duplicates). All six checks run in `lib lint`.
 
 ## Steps
 
 0. Print: `🔍 Running a vault health check — just a moment ✨`
 
-1. Resolve the wiki path: `librarian paths` → `$WIKI`.
+1. Resolve the wiki path: `lib paths` → `$WIKI`.
 
 2. Run:
 
 ```bash
-librarian lint "$WIKI"
+lib lint "$WIKI"
 ```
 
    Checks: schema drift (required keys, enum/range values) · orphans (no inbound

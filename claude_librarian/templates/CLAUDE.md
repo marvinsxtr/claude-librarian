@@ -25,13 +25,13 @@ CLAUDE.md          ← this file.
 ```
 
 **`notes/` is off-limits.** It is unrelated personal material — do not read it,
-link to it, or write to it during any librarian operation.
+link to it, or write to it during any lib operation.
 
 ## How the system works
 
 Papers arrive from two sources and queue asynchronously until ingested:
 
-- **Scholar Inbox** — recommendations. `librarian pull` fetches the digest and
+- **Scholar Inbox** — recommendations. `lib pull` fetches the digest and
   adds new papers to the Zotero `Inbox` collection.
 - **Zotero `Inbox`** — manual saves / browser connector. This collection *is* the
   queue.
@@ -41,12 +41,12 @@ no folder taxonomy is duplicated into Zotero. Processed state is tracked by a
 `wiki-ingested` tag in Zotero plus entries in `research/log.md`; the pipeline is
 idempotent on Zotero item key and paper slug.
 
-The `librarian` CLI does all deterministic work (sourcing, Zotero writes, PDF
+The `lib` CLI does all deterministic work (sourcing, Zotero writes, PDF
 parsing, vault writes, linting, logging). LLM subagents do only the four semantic
 steps. **If you'd call an agent N times in a loop, shell out to a script
 instead** — cost stays ~constant per paper.
 
-### The librarian CLI
+### The lib CLI
 
 Sourcing & Zotero hygiene: `config`, `login-scholar`, `doctor`, `pull`, `inbox`,
 `clean` (bibtex-zotero preprint upgrade + metadata backfill), `dedupe`,
@@ -57,7 +57,7 @@ Wiki engine (used by the skills): `init`, `fetch`, `assemble-paper`,
 `lint`, `log`, `paths`.
 
 The wiki directory passed to engine commands is `research/` (get it with
-`librarian paths`). Run `librarian <cmd> -h` for details.
+`lib paths`). Run `lib <cmd> -h` for details.
 
 ### Skills
 
