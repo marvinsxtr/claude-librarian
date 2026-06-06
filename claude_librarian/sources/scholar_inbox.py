@@ -22,6 +22,19 @@ _TITLE_KEYS = ("title", "paper_title", "name")
 _ARXIV_KEYS = ("arxiv_id", "arxiv", "arxivId", "arxiv_no")
 _DOI_KEYS = ("doi", "DOI")
 _URL_KEYS = ("url", "paper_url", "pdf_url", "link", "abs_url", "arxiv_url", "semantic_scholar_url")
+_ABSTRACT_KEYS = ("abstract", "summary", "tldr", "abstract_text", "paper_abstract")
+_KEYWORD_KEYS = ("keywords", "subjects", "categories", "topics", "tags", "fields_of_study")
+# Scholar Inbox's per-user relevance/ranking score, under whatever key it ships.
+_SCORE_KEYS = ("relevance_score", "relevance", "ranking_score", "rank_score",
+               "rel_score", "match_score", "score", "hype")
+
+
+def _num(val: Any) -> float | None:
+    try:
+        f = float(val)
+        return f
+    except (TypeError, ValueError):
+        return None
 
 
 def login(magic_link_url: str) -> None:
@@ -53,6 +66,16 @@ def _first(d: dict[str, Any], keys: tuple[str, ...]) -> Any:
         if k in d and d[k] not in (None, "", []):
             return d[k]
     return None
+
+
+def _norm_keywords(val: Any) -> list[str]:
+    if not val:
+        return []
+    if isinstance(val, str):
+        return [p.strip() for p in re.split(r"[,;|]", val) if p.strip()]
+    if isinstance(val, list):
+        return [str(x).strip() for x in val if str(x).strip()]
+    return []
 
 
 def _norm_authors(val: Any) -> list[str]:
@@ -93,6 +116,7 @@ def normalize(paper: dict[str, Any]) -> dict[str, Any]:
         if m and "arxiv" in url.lower():
             arxiv = m.group(1)
 
+    abstract = _first(paper, _ABSTRACT_KEYS)
     ref = arxiv or doi or url
     return {
         "title": str(title).strip() if title else None,
@@ -100,6 +124,9 @@ def normalize(paper: dict[str, Any]) -> dict[str, Any]:
         "arxiv_id": arxiv,
         "doi": doi,
         "url": url,
+        "abstract": str(abstract).strip() if abstract else None,
+        "keywords": _norm_keywords(_first(paper, _KEYWORD_KEYS)),
+        "scholar_score": _num(_first(paper, _SCORE_KEYS)),
         "fetch_ref": ref,
         "source": "scholar-inbox",
     }

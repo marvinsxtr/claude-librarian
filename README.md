@@ -21,6 +21,10 @@ summarizing, cross-referencing, filing, and bookkeeping.
 
 - **The markdown wiki is the organizing brain;** Zotero stays a thin
   capture/citation store (no duplicated folder taxonomy).
+- **Triage before you queue.** Scholar Inbox digests contain plenty of noise, so
+  `lib digest` ranks each recommendation by Scholar Inbox's own relevance score
+  *and* its affinity to your existing wiki (shared authors + field overlap). You
+  review the ranked digest and queue only what you want.
 - **Both sources queue asynchronously.** The Zotero `Inbox` collection *is* the
   queue; a `wiki-ingested` tag marks processed items. Papers accumulate until you
   next run `/paper-ingest`.
@@ -86,6 +90,9 @@ the same setup works headless / in CI.
 
 ## Daily use (in Claude Code, inside the vault)
 
+- `/paper-review` — triage the Scholar Inbox digest: ranks recommendations by
+  relevance + wiki affinity, you pick which to keep, queues them into the Zotero
+  Inbox. (CLI: `lib digest` to rank, `lib pull --only <refs>` to queue.)
 - `/paper-ingest` — drain the queue: clean Zotero → tag/move → fetch →
   summarize → extract findings → link the graph → mark processed.
 - `/paper-ingest <url|arxiv-id|doi|pdf>` — ingest one specific paper.
@@ -112,7 +119,7 @@ the wiki. Then `lib clean` (dry-run first) cleans metadata library-wide.
 
 | Group | Commands |
 |---|---|
-| Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
+| Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `digest` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
 | Wiki engine | `init` · `fetch` · `assemble-paper` · `assemble-finding` · `scan` · `citation-match` · `apply-edges` · `create-stubs` · `lint` · `log` · `paths` |
 
 Run `lib <command> -h` for details.
@@ -126,7 +133,7 @@ your-vault/
     index.md  log.md  .sources/
   notes/               your personal notes — untouched, never read or linked
   CLAUDE.md            the authoritative schema
-  .claude/skills/      paper-ingest, paper-query, paper-lint
+  .claude/skills/      paper-review, paper-ingest, paper-query, paper-lint
   .claude/agents/      the four subagents
 ```
 

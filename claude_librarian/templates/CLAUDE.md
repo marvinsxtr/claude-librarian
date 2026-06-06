@@ -31,8 +31,11 @@ link to it, or write to it during any lib operation.
 
 Papers arrive from two sources and queue asynchronously until ingested:
 
-- **Scholar Inbox** — recommendations. `lib pull` fetches the digest and
-  adds new papers to the Zotero `Inbox` collection.
+- **Scholar Inbox** — recommendations. **Triage first** with `lib digest`, which
+  ranks the digest by Scholar Inbox's own relevance score *and* affinity to this
+  wiki (shared authors + field overlap); then `lib pull --only <refs>` queues just
+  the papers you pick into the Zotero `Inbox`. (`lib pull` with no selection queues
+  everything new.)
 - **Zotero `Inbox`** — manual saves / browser connector. This collection *is* the
   queue.
 
@@ -48,9 +51,10 @@ instead** — cost stays ~constant per paper.
 
 ### The lib CLI
 
-Sourcing & Zotero hygiene: `config`, `login-scholar`, `doctor`, `pull`, `inbox`,
-`clean` (bibtex-zotero preprint upgrade + metadata backfill), `dedupe`,
-`migrate`.
+Sourcing & Zotero hygiene: `setup`, `config`, `login-scholar`, `doctor`,
+`digest` (rank the Scholar Inbox digest by relevance), `pull` (queue selected
+papers), `inbox`, `clean` (bibtex-zotero preprint upgrade + metadata backfill),
+`dedupe`, `migrate`.
 
 Wiki engine (used by the skills): `init`, `fetch`, `assemble-paper`,
 `assemble-finding`, `scan`, `citation-match`, `apply-edges`, `create-stubs`,
@@ -61,6 +65,8 @@ The wiki directory passed to engine commands is `research/` (get it with
 
 ### Skills
 
+- `/paper-review` — triage the Scholar Inbox digest: rank by relevance + wiki
+  affinity, you pick, queue the chosen into the Zotero Inbox. Run before pulling.
 - `/paper-ingest [ref]` — drain the queue (or ingest one ref): clean → tag/move
   in Zotero → fetch → summarize → extract findings → link → write pages.
 - `/paper-query "<question>"` — grep the wiki, read candidates, answer with

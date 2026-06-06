@@ -8,7 +8,8 @@ Two families of subcommands:
     config          set/show credentials and the vault path
     login-scholar   one-time Scholar Inbox magic-link login
     doctor          verify credentials, session, and vault
-    pull            Scholar Inbox digest -> new items in the Zotero Inbox
+    digest          rank today's Scholar Inbox digest by relevance (review only)
+    pull            queue selected Scholar Inbox papers into the Zotero Inbox
     inbox           list unprocessed Zotero Inbox items
     clean           run bibtex-zotero (preprint upgrade + metadata backfill)
     dedupe          report duplicate items in the Zotero library
@@ -214,47 +215,124 @@ def cmd_doctor(argv: list[str]) -> int:
     return 0 if ok else 1
 
 
-def cmd_pull(argv: list[str]) -> int:
-    from . import config
+def _digest_records(date: str | None, vault: str | None):
+    """Fetch the Scholar Inbox digest, drop items already in the Zotero library,
+    and score the rest against the wiki. Returns (scored_new, skipped, library_ids)."""
+    from . import config, triage
     from .sources import scholar_inbox
-    from .zotero import ZoteroLibrary, INBOX_NAME
-    ap = argparse.ArgumentParser(prog="lib pull")
-    ap.add_argument("--dry-run", action="store_true", help="list new papers without adding them to Zotero")
-    ap.add_argument("--date", default=None, help="digest date (YYYY-MM-DD); default = today")
-    ap.add_argument("--json", action="store_true")
-    args = ap.parse_args(argv)
+    from .zotero import ZoteroLibrary
 
-    records = scholar_inbox.get_records(date=args.date)
-    creds = config.zotero_creds()
-    lib = ZoteroLibrary(creds)
-    existing = lib.identity_index()
+    records = scholar_inbox.get_records(date=date)
+    library_ids: set[str] = set()
+    creds = config.zotero_creds(require=False)
+    if creds:
+        try:
+            library_ids = ZoteroLibrary(creds).identity_index()
+        except Exception:
+            library_ids = set()
 
     new, skipped = [], 0
     for r in records:
         ident = ZoteroLibrary.record_identity(r)
-        if ident and ident in existing:
+        if ident and ident in library_ids:
             skipped += 1
             continue
         new.append(r)
 
+    scored = triage.score_records(new, config.wiki_dir(vault), library_ids=library_ids)
+    return scored, skipped, library_ids
+
+
+def _fmt_score(r: dict) -> str:
+    sch = r.get("scholar_score")
+    sch_s = f"{sch:.2f}" if isinstance(sch, (int, float)) else "  – "
+    why = []
+    if r.get("matched_fields"):
+        why.append("fields: " + ", ".join(r["matched_fields"][:3]))
+    if r.get("matched_authors"):
+        why.append("authors: " + ", ".join(a.split(",")[0] for a in r["matched_authors"][:2]))
+    flags = " ".join(f for f, on in (("[in-wiki]", r.get("in_wiki")), ("[in-library]", r.get("in_library"))) if on)
+    return f"combined {r['combined']:.2f} · scholar {sch_s} · wiki {r.get('wiki_affinity', 0)}" \
+           + (f"  ({'; '.join(why)})" if why else "") + (f"  {flags}" if flags else "")
+
+
+def cmd_digest(argv: list[str]) -> int:
+    """Read-only: rank today's Scholar Inbox digest by relevance to you (Scholar's
+    own score) and affinity to your wiki. Decide what to queue, then `lib pull`."""
+    ap = argparse.ArgumentParser(prog="lib digest")
+    ap.add_argument("--date", default=None, help="digest date (YYYY-MM-DD); default = today")
+    ap.add_argument("--vault", default=None)
+    ap.add_argument("--limit", type=int, default=None, help="show only the top N")
+    ap.add_argument("--json", action="store_true")
+    args = ap.parse_args(argv)
+
+    scored, skipped, _ = _digest_records(args.date, args.vault)
+    shown = scored[: args.limit] if args.limit else scored
+
+    if args.json:
+        print(json.dumps({"count": len(scored), "skipped_in_library": skipped, "papers": shown}, indent=2))
+        return 0
+
+    print(f"Scholar Inbox digest — {len(scored)} new ({skipped} already in your library), "
+          f"ranked by relevance:\n")
+    for i, r in enumerate(shown, 1):
+        print(f"{i:>3}. {r.get('title')}")
+        print(f"     {_fmt_score(r)}")
+        print(f"     [{r.get('fetch_ref')}]")
+    print("\nQueue the ones you want with:  lib pull --only <ref1,ref2,...>")
+    print("Or queue the top slice:        lib pull --top <N>   /   lib pull --min-scholar-score <x>")
+    return 0
+
+
+def cmd_pull(argv: list[str]) -> int:
+    from . import config
+    from .zotero import ZoteroLibrary, INBOX_NAME
+    ap = argparse.ArgumentParser(prog="lib pull")
+    ap.add_argument("--dry-run", action="store_true", help="list selected papers without adding them to Zotero")
+    ap.add_argument("--date", default=None, help="digest date (YYYY-MM-DD); default = today")
+    ap.add_argument("--vault", default=None)
+    ap.add_argument("--only", default=None,
+                    help="comma-separated refs (arxiv id / doi / url) to queue — the rest are skipped")
+    ap.add_argument("--top", type=int, default=None, help="queue only the top N by combined relevance")
+    ap.add_argument("--min-scholar-score", type=float, default=None,
+                    help="queue only papers with a Scholar Inbox relevance score >= this")
+    ap.add_argument("--json", action="store_true")
+    args = ap.parse_args(argv)
+
+    scored, skipped, _ = _digest_records(args.date, args.vault)
+
+    selected = scored
+    if args.only:
+        wanted = {s.strip().lower() for s in args.only.split(",") if s.strip()}
+        selected = [r for r in selected if wanted & {
+            str(x).lower() for x in (r.get("fetch_ref"), r.get("arxiv_id"), r.get("doi"), r.get("url")) if x
+        }]
+    if args.min_scholar_score is not None:
+        selected = [r for r in selected if (r.get("scholar_score") or 0.0) >= args.min_scholar_score]
+    if args.top is not None:
+        selected = selected[: args.top]
+
     added = 0
-    if not args.dry_run and new:
+    if not args.dry_run and selected:
+        lib = ZoteroLibrary(config.zotero_creds())
         inbox_key = lib.ensure_collection(INBOX_NAME)
-        for r in new:
+        for r in selected:
             lib.add_record(r, collection_key=inbox_key, tags=["to-read"])
             added += 1
 
     if args.json:
-        print(json.dumps({"digest_count": len(records), "new": new, "skipped_existing": skipped,
-                          "added": added, "dry_run": args.dry_run}, indent=2))
+        print(json.dumps({"digest_new": len(scored), "skipped_existing": skipped,
+                          "selected": selected, "added": added, "dry_run": args.dry_run}, indent=2))
     else:
-        print(f"Scholar Inbox digest: {len(records)} papers, {skipped} already in library, {len(new)} new.")
-        for r in new:
-            print(f"  • {r.get('title')}  [{r.get('fetch_ref')}]")
+        print(f"Scholar Inbox digest: {len(scored)} new ({skipped} already in library); "
+              f"{len(selected)} selected.")
+        for r in selected:
+            print(f"  • {r.get('title')}  [{r.get('fetch_ref')}]  ({_fmt_score(r)})")
         if args.dry_run:
-            print("(dry run — nothing added. Re-run without --dry-run to queue them in the Zotero Inbox.)")
+            print("(dry run — nothing added.)")
         else:
-            print(f"Added {added} item(s) to the Zotero '{INBOX_NAME}' collection (tagged to-read).")
+            print(f"Added {added} item(s) to the Zotero '{INBOX_NAME}' collection (tagged to-read). "
+                  f"Run /paper-ingest to index them.")
     return 0
 
 
@@ -437,6 +515,7 @@ COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "config": cmd_config,
     "login-scholar": cmd_login_scholar,
     "doctor": cmd_doctor,
+    "digest": cmd_digest,
     "pull": cmd_pull,
     "inbox": cmd_inbox,
     "clean": cmd_clean,
