@@ -1,0 +1,28 @@
+{
+  "collapse-filter": false,
+  "search": "-path:research/views -path:research/index -path:notes",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    { "query": "path:research/authors", "color": { "a": 1, "rgb": 13917786 } },
+    { "query": "path:research/papers", "color": { "a": 1, "rgb": 13936730 } },
+    { "query": "path:research/findings", "color": { "a": 1, "rgb": 10802266 } },
+    { "query": "path:research/fields", "color": { "a": 1, "rgb": 9067732 } },
+    { "query": "path:research/threads", "color": { "a": 1, "rgb": 5431285 } }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": true,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1,
+  "close": false
+}

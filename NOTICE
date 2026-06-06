@@ -1,0 +1,24 @@
+claude-librarian
+Copyright (c) 2026 Marvin Sextro
+
+This product includes a wiki engine (the deterministic vault-writing scripts in
+claude_librarian/ — fetch_paper, assemble_paper, assemble_finding, vault_scan,
+citation_match, apply_edges, create_stubs, init_vault, lint, log — together with
+the page/view templates and the lite-drafter / finding-extractor /
+metadata-extractor / finding-linker subagent prompts) that is a reimplementation
+borrowing the design of:
+
+    claude-paperloom
+    https://github.com/trapoom555/claude-paperloom
+    Copyright the claude-paperloom authors
+    Licensed under the Apache License, Version 2.0
+
+A copy of the Apache License, Version 2.0 may be obtained at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The additions in claude-librarian — Zotero ingestion and hygiene (pyzotero +
+bibtex-updater), the Scholar Inbox source adapter (scholarinboxcli), the async
+queue model with wiki-ingested markers, the threads/ synthesis layer, and the
+unified `librarian` CLI — are original work licensed under the MIT License (see
+LICENSE).
