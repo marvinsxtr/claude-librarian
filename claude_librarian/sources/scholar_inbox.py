@@ -11,7 +11,10 @@ defensive: it scans the common container keys and per-paper field names.
 
 from __future__ import annotations
 
+import json
 import re
+import time
+from pathlib import Path
 from typing import Any
 
 _ARXIV_RE = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?", re.IGNORECASE)
@@ -40,29 +43,66 @@ def _num(val: Any) -> float | None:
 _SHA_RE = re.compile(r"[0-9a-f]{16,}", re.IGNORECASE)
 
 
-def _normalize_login_input(raw: str) -> str:
-    """Accept a Scholar Inbox magic link in any of its forms and return a URL the
-    client logs in with reliably. Handles the ``?sha_key=…`` query form, the
-    ``…/login/<sha>`` path form, and a bare sha token — the latter two are
-    rewritten to the query form (the only one that hits the login API)."""
+def extract_sha(raw: str) -> str | None:
+    """Pull the sha token out of a Scholar Inbox magic link in any of its forms:
+    the ``?sha_key=…`` query form, the ``…/login/<sha>`` path form, or a bare sha."""
     s = raw.strip()
     if "sha_key=" in s:
-        return s
+        from urllib.parse import parse_qs, urlparse
+        v = parse_qs(urlparse(s).query).get("sha_key", [None])[0]
+        if v:
+            return v
     candidate = s.rstrip("/").rsplit("/", 1)[-1]
-    sha = candidate if _SHA_RE.fullmatch(candidate) else None
-    if not sha:
-        m = _SHA_RE.search(s)
-        sha = m.group(0) if m else None
-    if sha:
-        return f"https://www.scholar-inbox.com/login?sha_key={sha}"
-    return s
+    if _SHA_RE.fullmatch(candidate):
+        return candidate
+    m = _SHA_RE.search(s)
+    return m.group(0) if m else None
 
 
-def login(magic_link_url: str) -> None:
+def _login_url(raw: str) -> str:
+    """A URL the client logs in with reliably — the ``sha_key`` query form is the
+    only one that hits the login API, so rewrite path/bare-sha inputs to it."""
+    sha = extract_sha(raw)
+    return f"https://www.scholar-inbox.com/login?sha_key={sha}" if sha else raw.strip()
+
+
+def login(magic_link_url: str) -> str | None:
+    """Log in via a magic link (URL / ``/login/<sha>`` / bare sha). Returns the sha
+    used, so the caller can cache it for silent re-auth."""
     from scholarinboxcli.api.client import ScholarInboxClient
     client = ScholarInboxClient()
-    client.login_with_magic_link(_normalize_login_input(magic_link_url))
+    client.login_with_magic_link(_login_url(magic_link_url))
     client.close()
+    return extract_sha(magic_link_url)
+
+
+def session_expires() -> int | None:
+    """Unix expiry of the stored Scholar Inbox session cookie, or None if there is
+    no session file / no expiry recorded."""
+    try:
+        from scholarinboxcli.config import CONFIG_PATH
+    except Exception:
+        return None
+    path = Path(CONFIG_PATH)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    for c in data.get("cookies", []):
+        if c.get("name") == "session" and c.get("expires"):
+            try:
+                return int(c["expires"])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def session_valid(within: float = 0) -> bool:
+    """True if a stored session exists and won't expire within `within` seconds."""
+    exp = session_expires()
+    return bool(exp and exp - time.time() > within)
 
 
 def _papers_from_digest(digest: Any) -> list[dict[str, Any]]:

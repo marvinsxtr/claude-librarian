@@ -9,10 +9,12 @@ the same settings work in headless / CI runs:
     ZOTERO_LIBRARY_TYPE  "user" (default) or "group"
     S2_API_KEY           optional — lifts bibtex-updater rate limits
     LIBRARIAN_VAULT      Obsidian vault root (the dir containing research/)
+    SCHOLAR_SHA_KEY      Scholar Inbox durable login token (sha), for auto re-auth
 
-Scholar Inbox auth is handled separately by scholarinboxcli, which stores its
-session cookies in ``~/.config/scholarinboxcli/config.json`` after a one-time
-magic-link login (``lib login-scholar <magic-link-url>``).
+Scholar Inbox session cookies are stored by scholarinboxcli in
+``~/.config/scholarinboxcli/config.json`` after a magic-link login
+(``lib login-scholar <magic-link-url>``). We additionally cache the durable sha
+here (0600) so an expired session can be re-minted without a new email.
 
 The Zotero env-var names match what ``bibtex-zotero`` already reads, so the
 cleaning stage needs no extra wiring.
@@ -97,6 +99,11 @@ def export_zotero_env(creds: ZoteroCreds) -> dict[str, str]:
     if s2:
         env["S2_API_KEY"] = s2
     return env
+
+
+def scholar_sha() -> str | None:
+    """The cached Scholar Inbox sha (env var, then config file)."""
+    return _get(load(), "SCHOLAR_SHA_KEY", "scholar_sha_key")
 
 
 def vault_path(explicit: str | None = None) -> Path:
