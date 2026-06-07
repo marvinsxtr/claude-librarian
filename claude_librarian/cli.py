@@ -118,7 +118,10 @@ def cmd_setup(argv: list[str]) -> int:
         from .sources import scholar_inbox
         print("\nLogging into Scholar Inbox…")
         try:
-            scholar_inbox.login(scholar)
+            sha = scholar_inbox.login(scholar)
+            if sha:
+                cfg["scholar_sha_key"] = sha
+                config.save(cfg)
             print("Scholar Inbox session saved.")
         except Exception as e:
             print(f"Scholar Inbox login failed: {e}")
@@ -161,19 +164,28 @@ def cmd_config(argv: list[str]) -> int:
             masked["zotero_api_key"] = masked["zotero_api_key"][:4] + "…(set)"
         if masked.get("s2_api_key"):
             masked["s2_api_key"] = "…(set)"
+        if masked.get("scholar_sha_key"):
+            masked["scholar_sha_key"] = masked["scholar_sha_key"][:6] + "…(set)"
         print(json.dumps(masked or {"(empty)": "run `lib config --help`"}, indent=2))
     return 0
 
 
 def cmd_login_scholar(argv: list[str]) -> int:
+    from . import config
     from .sources import scholar_inbox
     ap = argparse.ArgumentParser(prog="lib login-scholar")
     ap.add_argument("magic_link_url",
                     help="Scholar Inbox magic link from your login email — full URL, "
                          "the /login/<sha> link, or just the sha")
     args = ap.parse_args(argv)
-    scholar_inbox.login(args.magic_link_url)
-    print("Scholar Inbox session saved to ~/.config/scholarinboxcli/config.json")
+    sha = scholar_inbox.login(args.magic_link_url)
+    if sha:
+        cfg = config.load()
+        cfg["scholar_sha_key"] = sha
+        config.save(cfg)
+        print("Scholar Inbox session saved (sha cached for auto re-login).")
+    else:
+        print("Scholar Inbox session saved to ~/.config/scholarinboxcli/config.json")
     return 0
 
 
@@ -200,10 +212,18 @@ def cmd_doctor(argv: list[str]) -> int:
             print(f"Zotero      ✗ key check failed: {e}")
             ok = False
 
+    _ensure_scholar_session()
     try:
+        import datetime
+        import time as _time
         from scholarinboxcli.config import CONFIG_PATH as SCHOLAR_CFG
-        if SCHOLAR_CFG.exists():
-            print(f"Scholar     ✓ session file present ({SCHOLAR_CFG})")
+        from .sources import scholar_inbox
+        exp = scholar_inbox.session_expires()
+        if exp and exp > _time.time():
+            when = datetime.datetime.fromtimestamp(exp).strftime("%Y-%m-%d %H:%M")
+            print(f"Scholar     ✓ session valid until {when}")
+        elif SCHOLAR_CFG.exists() or config.scholar_sha():
+            print("Scholar     ⚠ session expired (run `lib login-scholar <magic-link>`) — optional")
         else:
             print("Scholar     ⚠ not logged in (run `lib login-scholar <magic-link>`) — optional")
     except Exception:
@@ -225,6 +245,20 @@ def cmd_doctor(argv: list[str]) -> int:
     return 0 if ok else 1
 
 
+def _ensure_scholar_session() -> None:
+    """Silently re-login to Scholar Inbox if the stored session is missing or about
+    to expire, using the cached sha. No-op when no sha is cached."""
+    from . import config
+    from .sources import scholar_inbox
+    sha = config.scholar_sha()
+    if not sha or scholar_inbox.session_valid(within=86400):  # >1 day of life left
+        return
+    try:
+        scholar_inbox.login(sha)
+    except Exception as e:
+        print(f"⚠ Scholar Inbox auto re-login failed: {e}", file=sys.stderr)
+
+
 def _digest_records(date: str | None, vault: str | None):
     """Fetch the Scholar Inbox digest, drop items already in the Zotero library,
     and score the rest against the wiki. Returns (scored_new, skipped, library_ids)."""
@@ -232,6 +266,7 @@ def _digest_records(date: str | None, vault: str | None):
     from .sources import scholar_inbox
     from .zotero import ZoteroLibrary
 
+    _ensure_scholar_session()
     records = scholar_inbox.get_records(date=date)
     library_ids: set[str] = set()
     creds = config.zotero_creds(require=False)
