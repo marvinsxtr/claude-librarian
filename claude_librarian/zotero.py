@@ -11,7 +11,7 @@ actually populates (DOI, url, extra, archiveID).
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+from typing import Any
 
 from pyzotero import zotero
 
@@ -19,7 +19,6 @@ from .config import ZoteroCreds
 
 INGESTED_TAG = "wiki-ingested"
 INBOX_NAME = "Inbox"
-ARCHIVE_NAME = "Archive"
 
 _ARXIV_RE = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?", re.IGNORECASE)
 _DOI_RE = re.compile(r"\b(10\.\d{4,}/[^\s,;)\"]+)", re.IGNORECASE)
@@ -248,69 +247,6 @@ class ZoteroLibrary:
         title = str(record.get("title") or "").strip().lower()
         return f"title:{title}" if title else None
 
-    # ---- migration helpers ----
-
-    def archive_existing_collections(self, dry_run: bool = False) -> dict[str, Any]:
-        """Create an `Archive` collection and reparent every existing top-level
-        collection (except Inbox/Archive) under it. Non-destructive: items keep
-        their collection membership; only the collection hierarchy changes."""
-        archive_key = None if dry_run else self.ensure_collection(ARCHIVE_NAME)
-        moved: list[str] = []
-        for c in self.all_collections():
-            d = c.get("data", {})
-            name = d.get("name")
-            if name in (INBOX_NAME, ARCHIVE_NAME):
-                continue
-            if d.get("parentCollection"):  # only reparent top-level collections
-                continue
-            moved.append(name)
-            if not dry_run:
-                payload = dict(d)
-                payload["parentCollection"] = archive_key
-                self.zot.update_collection(payload)
-        return {"archive_key": archive_key, "reparented": moved, "dry_run": dry_run}
-
-    def copy_from_group(self, group_creds: ZoteroCreds, collection_name: str | None = None,
-                        dest_collection: str | None = None, dry_run: bool = False) -> dict[str, Any]:
-        """Pull items from a shared/group library into this (personal) library.
-
-        Reads items from the group (optionally limited to one collection name),
-        skips ones already present here (by arXiv id / DOI / title), and creates
-        the rest. Returns a summary; never deletes from the group.
-        """
-        group = ZoteroLibrary(group_creds)
-        if collection_name:
-            ckey = group.find_collection(collection_name)
-            src_items = group.collection_items(ckey) if ckey else []
-        else:
-            src_items = [it for it in group.zot.everything(group.zot.top())
-                         if it.get("data", {}).get("itemType") not in _NON_PAPER_TYPES]
-
-        existing = self._identity_index()
-        to_create: list[dict[str, Any]] = []
-        skipped = 0
-        for it in src_items:
-            ident = self._identity_key(it)
-            if ident and ident in existing:
-                skipped += 1
-                continue
-            data = dict(it.get("data", {}))
-            for k in ("key", "version", "collections", "relations", "dateAdded", "dateModified"):
-                data.pop(k, None)
-            to_create.append(data)
-
-        created = 0
-        if not dry_run and to_create:
-            for batch in _chunks(to_create, 50):
-                resp = self.zot.create_items(batch)
-                created += len(resp.get("successful", {}) or resp.get("success", {}))
-                if dest_collection:
-                    dkey = self.ensure_collection(dest_collection)
-                    for made in (resp.get("successful") or {}).values():
-                        self.zot.addto_collection(dkey, made)
-        return {"source_count": len(src_items), "skipped_existing": skipped,
-                "created": created if not dry_run else len(to_create), "dry_run": dry_run}
-
     def _identity_key(self, item: dict[str, Any]) -> str | None:
         arxiv = extract_arxiv_id(item)
         if arxiv:
@@ -340,8 +276,3 @@ class ZoteroLibrary:
                 continue
             groups.setdefault(k, []).append(normalize_item(it))
         return [g for g in groups.values() if len(g) > 1]
-
-
-def _chunks(xs: list[Any], n: int) -> Iterable[list[Any]]:
-    for i in range(0, len(xs), n):
-        yield xs[i:i + n]

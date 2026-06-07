@@ -54,7 +54,7 @@ instead** — cost stays ~constant per paper.
 Sourcing & Zotero hygiene: `setup`, `config`, `login-scholar`, `doctor`,
 `digest` (rank the Scholar Inbox digest by relevance), `pull` (queue selected
 papers), `inbox`, `clean` (bibtex-zotero preprint upgrade + metadata backfill),
-`dedupe`, `migrate`.
+`dedupe`.
 
 Wiki engine (used by the skills): `init`, `fetch`, `assemble-paper`,
 `assemble-finding`, `scan`, `citation-match`, `apply-edges`, `create-stubs`,
