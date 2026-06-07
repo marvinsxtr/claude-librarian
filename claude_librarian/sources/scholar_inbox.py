@@ -37,10 +37,31 @@ def _num(val: Any) -> float | None:
         return None
 
 
+_SHA_RE = re.compile(r"[0-9a-f]{16,}", re.IGNORECASE)
+
+
+def _normalize_login_input(raw: str) -> str:
+    """Accept a Scholar Inbox magic link in any of its forms and return a URL the
+    client logs in with reliably. Handles the ``?sha_key=…`` query form, the
+    ``…/login/<sha>`` path form, and a bare sha token — the latter two are
+    rewritten to the query form (the only one that hits the login API)."""
+    s = raw.strip()
+    if "sha_key=" in s:
+        return s
+    candidate = s.rstrip("/").rsplit("/", 1)[-1]
+    sha = candidate if _SHA_RE.fullmatch(candidate) else None
+    if not sha:
+        m = _SHA_RE.search(s)
+        sha = m.group(0) if m else None
+    if sha:
+        return f"https://www.scholar-inbox.com/login?sha_key={sha}"
+    return s
+
+
 def login(magic_link_url: str) -> None:
     from scholarinboxcli.api.client import ScholarInboxClient
     client = ScholarInboxClient()
-    client.login_with_magic_link(magic_link_url)
+    client.login_with_magic_link(_normalize_login_input(magic_link_url))
     client.close()
 
 
