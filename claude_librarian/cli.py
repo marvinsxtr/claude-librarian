@@ -14,7 +14,6 @@ Two families of subcommands:
     clean           run bibtex-zotero (preprint upgrade + metadata backfill)
     dedupe          report duplicate items in the Zotero library
     zotero-update   tag + move-out-of-inbox + mark a Zotero item ingested
-    migrate         one-time: Inbox/Archive setup + scaffold the wiki
 
   Wiki engine (deterministic vault writes — used by the skills):
     init            scaffold the wiki + install skills/agents into a vault
@@ -94,7 +93,7 @@ def cmd_setup(argv: list[str]) -> int:
     zkey = args.zkey or ask("Zotero API key", secret=True) or cfg.get("zotero_api_key")
     ztype = args.ztype or ask("Zotero library type (user/group)", default=cfg.get("zotero_library_type") or "user")
     s2 = args.s2 or ask("Semantic Scholar API key (optional, Enter to skip)", default=cfg.get("s2_api_key"))
-    scholar = args.scholar or ask("Scholar Inbox magic-link URL (optional, Enter to skip)")
+    scholar = args.scholar or ask("Scholar Inbox magic link — URL or sha (optional, Enter to skip)")
 
     for k, v in {"vault_path": vault, "zotero_library_id": zid, "zotero_api_key": zkey,
                  "zotero_library_type": ztype, "s2_api_key": s2}.items():
@@ -105,6 +104,15 @@ def cmd_setup(argv: list[str]) -> int:
 
     print("\nScaffolding the wiki…")
     init_vault.main([vault])
+
+    creds = config.zotero_creds(require=False)
+    if creds:
+        from .zotero import ZoteroLibrary, INBOX_NAME
+        try:
+            ZoteroLibrary(creds).ensure_collection(INBOX_NAME)
+            print(f"Ensured Zotero '{INBOX_NAME}' collection (the ingest queue).")
+        except Exception as e:
+            print(f"Could not create the Zotero '{INBOX_NAME}' collection: {e}")
 
     if scholar:
         from .sources import scholar_inbox
@@ -160,7 +168,9 @@ def cmd_config(argv: list[str]) -> int:
 def cmd_login_scholar(argv: list[str]) -> int:
     from .sources import scholar_inbox
     ap = argparse.ArgumentParser(prog="lib login-scholar")
-    ap.add_argument("magic_link_url", help="the Scholar Inbox magic-link URL from your login email")
+    ap.add_argument("magic_link_url",
+                    help="Scholar Inbox magic link from your login email — full URL, "
+                         "the /login/<sha> link, or just the sha")
     args = ap.parse_args(argv)
     scholar_inbox.login(args.magic_link_url)
     print("Scholar Inbox session saved to ~/.config/scholarinboxcli/config.json")
@@ -394,57 +404,6 @@ def cmd_dedupe(argv: list[str]) -> int:
     return 0
 
 
-def cmd_migrate(argv: list[str]) -> int:
-    from . import config
-    from .config import ZoteroCreds
-    from .zotero import ZoteroLibrary, INBOX_NAME, ARCHIVE_NAME
-    from . import init_vault
-    ap = argparse.ArgumentParser(prog="lib migrate")
-    ap.add_argument("--vault", default=None, help="Obsidian vault root (default: configured vault_path)")
-    ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--archive-existing", action="store_true",
-                    help="reparent existing top-level collections under Archive/")
-    ap.add_argument("--group-id", default=None, help="pull items from this group library id")
-    ap.add_argument("--group-collection", default=None, help="limit group pull to this collection name")
-    args = ap.parse_args(argv)
-
-    creds = config.zotero_creds()
-    lib = ZoteroLibrary(creds)
-
-    print("== Zotero structure ==")
-    if args.dry_run:
-        print(f"  would ensure '{INBOX_NAME}' and '{ARCHIVE_NAME}' collections exist")
-    else:
-        lib.ensure_collection(INBOX_NAME)
-        lib.ensure_collection(ARCHIVE_NAME)
-        print(f"  ensured '{INBOX_NAME}' and '{ARCHIVE_NAME}' collections")
-
-    if args.archive_existing:
-        res = lib.archive_existing_collections(dry_run=args.dry_run)
-        verb = "would reparent" if args.dry_run else "reparented"
-        print(f"  {verb} {len(res['reparented'])} collection(s) under {ARCHIVE_NAME}/: {res['reparented']}")
-
-    if args.group_id:
-        gcreds = ZoteroCreds(library_id=args.group_id, api_key=creds.api_key, library_type="group")
-        res = lib.copy_from_group(gcreds, collection_name=args.group_collection,
-                                  dest_collection=INBOX_NAME, dry_run=args.dry_run)
-        print(f"  group {args.group_id}: {res['source_count']} items, {res['skipped_existing']} dupes skipped, "
-              f"{res['created']} {'to create' if args.dry_run else 'created'}")
-
-    print("\n== Scaffold wiki ==")
-    vault = str(config.vault_path(args.vault))
-    if args.dry_run:
-        print(f"  would run `lib init {vault}`")
-    else:
-        init_vault.main([vault])
-
-    print("\nNext steps:")
-    print("  1. lib clean            # dry-run preprint upgrade + metadata backfill on the Inbox")
-    print("  2. lib clean --apply    # apply it")
-    print("  3. /paper-ingest              # ingest the active subset into the wiki")
-    return 0
-
-
 def cmd_zotero_update(argv: list[str]) -> int:
     """Deterministic Zotero-side step of an ingest: tag, move out of Inbox, mark
     wiki-ingested — in one call, so the skill never loops an LLM over items."""
@@ -520,7 +479,6 @@ COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "inbox": cmd_inbox,
     "clean": cmd_clean,
     "dedupe": cmd_dedupe,
-    "migrate": cmd_migrate,
     "zotero-update": cmd_zotero_update,
     "paths": cmd_paths,
     # wiki engine

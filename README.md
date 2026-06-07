@@ -38,7 +38,14 @@ summarizing, cross-referencing, filing, and bookkeeping.
 ## Install
 
 ```bash
-uv tool install claude-librarian      # or: pipx install claude-librarian
+uv tool install git+https://github.com/marvinsxtr/claude-librarian
+# or: pipx install git+https://github.com/marvinsxtr/claude-librarian
+```
+
+From a local checkout (run from the repo root; add `--editable` if you're hacking on it):
+
+```bash
+uv tool install .
 ```
 
 This puts the `lib` console script on your PATH and pulls in `pyzotero`,
@@ -47,8 +54,9 @@ This puts the `lib` console script on your PATH and pulls in `pyzotero`,
 ## Setup
 
 The fastest path is the **guided setup** — it collects your credentials, saves
-them, scaffolds the wiki, optionally logs into Scholar Inbox, and runs a health
-check, all in one go:
+them, scaffolds the wiki, creates the Zotero `Inbox` collection (the ingest
+queue), optionally logs into Scholar Inbox, and runs a health check, all in one
+go:
 
 ```bash
 lib setup
@@ -61,8 +69,8 @@ It prompts for:
   create a write-access key and find your id at
   <https://www.zotero.org/settings/keys>. Enable Zotero sync.
 - **Semantic Scholar API key** (optional — lifts bibtex-updater rate limits).
-- **Scholar Inbox magic-link URL** (optional — paste the link from your login
-  email to log in once).
+- **Scholar Inbox magic link** (optional — paste the link from your login email
+  to log in once; the full URL, the `/login/<sha>` link, or just the sha all work).
 
 You can also pass any of these as flags (`--vault`, `--zotero-library-id`,
 `--zotero-api-key`, `--zotero-library-type`, `--s2-api-key`, `--scholar-link`) and
@@ -79,7 +87,7 @@ If you'd rather set each piece yourself:
 ```bash
 lib config --vault ~/path/to/your-vault \
     --zotero-library-id 1234567 --zotero-api-key XXXX   # credentials + vault path
-lib login-scholar "https://www.scholar-inbox.com/...&sha_key=..."  # optional
+lib login-scholar "https://www.scholar-inbox.com/login/<sha>"   # optional — or just the sha
 lib init ~/path/to/your-vault                     # scaffold wiki + install skills
 lib doctor                                        # verify everything
 ```
@@ -103,23 +111,11 @@ Open the vault in Obsidian alongside Claude Code: the **Graph View** shows the
 knowledge graph, and the bundled **Dataview** views (`research/views/`) render
 by-field / by-author / contradictions / high-credibility / recent / threads.
 
-## One-time migration
-
-```bash
-lib migrate --vault ~/path/to/your-vault --archive-existing
-# optionally pull from a shared group library:
-lib migrate --vault ~/path/to/your-vault --group-id 987654 --group-collection "Reading"
-```
-
-Creates `Inbox` + `Archive`, reparents existing collections under `Archive/`
-(non-destructive), optionally pulls + dedupes from a group library, and scaffolds
-the wiki. Then `lib clean` (dry-run first) cleans metadata library-wide.
-
 ## The `lib` CLI
 
 | Group | Commands |
 |---|---|
-| Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `digest` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` · `migrate` |
+| Sourcing & Zotero | `setup` · `config` · `login-scholar` · `doctor` · `digest` · `pull` · `inbox` · `clean` · `dedupe` · `zotero-update` |
 | Wiki engine | `init` · `fetch` · `assemble-paper` · `assemble-finding` · `scan` · `citation-match` · `apply-edges` · `create-stubs` · `lint` · `log` · `paths` |
 
 Run `lib <command> -h` for details.
