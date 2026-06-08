@@ -30,8 +30,10 @@ lib paths        # -> {"vault": "...", "wiki": ".../research"}
 - **If `$ARGUMENTS` is a paper reference:** the work list is that single ref
   (`zotero_key` unknown — skip the Zotero-side step 6 for it).
 - **Otherwise (drain the queue):**
-  1. `lib clean` — dry-run preprint upgrade + metadata backfill over the
-     Inbox. Show the preview. If it looks right, run `lib clean --apply`.
+  1. `lib clean --apply` — preprint upgrade + metadata backfill over the
+     Inbox, applied directly. `bibtex-zotero` is idempotent and preserves
+     tags/collections, so no dry-run preview is needed (a dry-run would only
+     repeat the same external lookups). Briefly report what was upgraded.
   2. `lib inbox --json` — the unprocessed Inbox items. Each record has
      `title`, `fetch_ref`, `zotero_key`, `authors`. The work list is these
      records; `fetch_ref` is the ingest input.
@@ -135,11 +137,10 @@ Call it even with `"linker_output": []` so `cites` still merge in.
 ## Step 6 — Zotero hygiene (queue items only)
 
 For a queue item (has `zotero_key`), decide coarse/functional tags (e.g.
-`to-read`, a field tag or two) and optionally a `Projects/<name>` collection if
-the user is citing it in a manuscript. Then one deterministic call:
+`to-read`, a field tag or two). Then one deterministic call:
 
 ```bash
-lib zotero-update --key "<zotero_key>" --add-tags "<tag1,tag2>" [--project "<Name>"] --mark-ingested
+lib zotero-update --key "<zotero_key>" --add-tags "<tag1,tag2>" --mark-ingested
 ```
 
 This tags the item, moves it out of `Inbox`, and marks it `wiki-ingested`.

@@ -447,7 +447,6 @@ def cmd_zotero_update(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="lib zotero-update")
     ap.add_argument("--key", required=True, help="Zotero item key")
     ap.add_argument("--add-tags", default="", help="comma-separated coarse/functional tags")
-    ap.add_argument("--project", default=None, help="move into Projects/<name> (created on demand)")
     ap.add_argument("--mark-ingested", action="store_true", help="add the wiki-ingested tag")
     ap.add_argument("--keep-in-inbox", action="store_true", help="do not remove from Inbox")
     args = ap.parse_args(argv)
@@ -463,13 +462,6 @@ def cmd_zotero_update(argv: list[str]) -> int:
         lib.set_tags(item, *tags)
         actions.append(f"tagged {tags}")
         item = lib.get_item(args.key)  # refresh version after the patch
-
-    if args.project:
-        projects_key = lib.ensure_collection("Projects")
-        dest = lib.ensure_collection(args.project, parent=projects_key)
-        lib.zot.addto_collection(dest, item)
-        actions.append(f"added to Projects/{args.project}")
-        item = lib.get_item(args.key)
 
     if not args.keep_in_inbox:
         inbox = lib.find_collection(INBOX_NAME)
