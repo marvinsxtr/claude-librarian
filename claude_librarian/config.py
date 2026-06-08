@@ -8,6 +8,9 @@ the same settings work in headless / CI runs:
     ZOTERO_LIBRARY_ID    numeric user id (or group id)
     ZOTERO_LIBRARY_TYPE  "user" (default) or "group"
     S2_API_KEY           optional — lifts bibtex-updater rate limits
+    ZOTERO_WEBDAV_URL    optional — Zotero WebDAV file-sync URL (fetch fallback)
+    ZOTERO_WEBDAV_USER   optional — Zotero WebDAV username
+    ZOTERO_WEBDAV_PASSWORD  optional — Zotero WebDAV password
     LIBRARIAN_VAULT      Obsidian vault root (the dir containing research/)
     SCHOLAR_SHA_KEY      Scholar Inbox durable login token (sha), for auto re-auth
 
@@ -85,6 +88,28 @@ def zotero_creds(require: bool = True) -> ZoteroCreds | None:
             )
         return None
     return ZoteroCreds(library_id=library_id, api_key=api_key, library_type=library_type)
+
+
+@dataclass
+class WebDavCreds:
+    url: str
+    user: str | None = None
+    password: str | None = None
+
+
+def webdav_creds() -> WebDavCreds | None:
+    """Zotero WebDAV file-sync credentials (env vars, then config file). Used as a
+    fetch fallback: Zotero stores each attachment as ``<url>/<attachmentKey>.zip``.
+    Returns None if no URL is configured."""
+    cfg = load()
+    url = _get(cfg, "ZOTERO_WEBDAV_URL", "zotero_webdav_url")
+    if not url:
+        return None
+    return WebDavCreds(
+        url=url.rstrip("/"),
+        user=_get(cfg, "ZOTERO_WEBDAV_USER", "zotero_webdav_user"),
+        password=_get(cfg, "ZOTERO_WEBDAV_PASSWORD", "zotero_webdav_password"),
+    )
 
 
 def export_zotero_env(creds: ZoteroCreds) -> dict[str, str]:

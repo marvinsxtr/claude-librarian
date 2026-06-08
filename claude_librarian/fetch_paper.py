@@ -315,18 +315,26 @@ def _zotero_attachment_bytes(zotero_key: str) -> Optional[bytes]:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="lib fetch", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault", help="the wiki directory (e.g. <vault>/research)")
-    ap.add_argument("input", help="arxiv id / DOI / URL / local PDF path")
+    ap.add_argument("input", nargs="?", default=None,
+                    help="arxiv id / DOI / URL / local PDF path (omit to fetch only from --zotero-key)")
     ap.add_argument("--force", action="store_true", help="re-extract even if cached")
     ap.add_argument("--zotero-key", default=None,
-                    help="fallback: if the web source is unreachable, fetch the PDF "
-                         "from this Zotero item's attachment")
+                    help="fetch the PDF from this Zotero item's attachment — as a fallback when "
+                         "the web source is unreachable, or as the only source when no input is given")
     args = ap.parse_args(argv)
 
     vault = require_vault(args.vault)
     sources = vault / ".sources"
     sources.mkdir(exist_ok=True)
 
-    src_type, src_url, arxiv_id, doi = classify(args.input)
+    if args.input:
+        src_type, src_url, arxiv_id, doi = classify(args.input)
+    elif args.zotero_key:
+        # attachment-only: no web reference, fetch straight from the Zotero attachment
+        src_type, src_url, arxiv_id, doi = "zotero", f"zotero://{args.zotero_key}", None, None
+    else:
+        die("provide a paper reference or --zotero-key")
+        return 1
 
     existing = find_existing_paper(vault, src_url, arxiv_id, doi)
     if existing is not None:
@@ -356,18 +364,19 @@ def main(argv: list[str]) -> int:
     fetch_method = "cached"
     if not skipped_cached:
         got_pdf = False
-        # 1. primary source (local file / arXiv / generic URL)
-        try:
-            if src_type == "pdf":
-                shutil.copy2(Path(src_url), raw_path)
-            elif src_type == "arxiv":
-                download(arxiv_pdf_url(arxiv_id or ""), raw_path)
-            else:
-                download(src_url, raw_path)
-            got_pdf = raw_path.exists() and raw_path.read_bytes()[:5].startswith(b"%PDF")
-            fetch_method = "web" if got_pdf else fetch_method
-        except DownloadError:
-            got_pdf = False
+        # 1. primary source (local file / arXiv / generic URL); skipped in zotero-only mode
+        if src_type != "zotero":
+            try:
+                if src_type == "pdf":
+                    shutil.copy2(Path(src_url), raw_path)
+                elif src_type == "arxiv":
+                    download(arxiv_pdf_url(arxiv_id or ""), raw_path)
+                else:
+                    download(src_url, raw_path)
+                got_pdf = raw_path.exists() and raw_path.read_bytes()[:5].startswith(b"%PDF")
+                fetch_method = "web" if got_pdf else fetch_method
+            except DownloadError:
+                got_pdf = False
 
         # 2. fallback: pull the PDF from the item's Zotero attachment. Covers
         #    Cloudflare/Incapsula-gated sources (e.g. bioRxiv) the user has saved.

@@ -53,6 +53,9 @@ function buildPrompt(it) {
   const pd = pubDate(it)
   const safe = (it.zotero_key || it.ref).replace(/[^A-Za-z0-9._-]/g, '_')
   const payloadPath = `${OUT}/${safe}.json`
+  const fetchCmd = it.ref
+    ? `lib fetch "${WIKI}" "${it.ref}" --zotero-key "${it.zotero_key || ''}"`
+    : `lib fetch "${WIKI}" --zotero-key "${it.zotero_key || ''}"`   // no web ref: attachment-only
   return [
     "You ingest ONE paper into a research wiki — the EXTRACT phase only. Write NO wiki pages; your ONLY file write is the payload JSON in step 4.",
     "",
@@ -65,7 +68,7 @@ function buildPrompt(it) {
     JSON.stringify(existingFields),
     "",
     "## Steps",
-    `1. Bash:  lib fetch "${WIKI}" "${it.ref}" --zotero-key "${it.zotero_key || ''}"   then parse the JSON it prints.`,
+    `1. Bash:  ${fetchCmd}   then parse the JSON it prints. (It tries the web source first, then falls back to the Zotero attachment via WebDAV/Zotero storage; with no web ref it fetches the attachment directly.)`,
     "   - If \"already_exists\" is true: write NO payload; return {ref, zotero_key, status:'exists', title:(Zotero title), n_findings:0, payload_path:'', note:(the existing slug)}.",
     "   - Else capture from it: brief_text_path, findings_text_path, source_url, full_text_path, arxiv_id, doi.",
     `2. Read the style spec "${STYLE}" ("Paper body" section) and apply it. Read brief_text_path and findings_text_path.`,

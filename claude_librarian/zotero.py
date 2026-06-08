@@ -206,8 +206,9 @@ class ZoteroLibrary:
     def attachment_pdf_bytes(self, item_key: str) -> bytes | None:
         """Return the bytes of the item's first PDF attachment, or None.
 
-        Used as a fetch fallback when the web source is unreachable (e.g. a
-        Cloudflare-gated bioRxiv DOI) but the user has the PDF saved in Zotero.
+        Fetch fallback when the web source is unreachable (e.g. a Cloudflare-gated
+        bioRxiv DOI) but the user has the PDF in Zotero. Tries Zotero-storage file
+        sync (the Web API), then WebDAV file sync (``<url>/<attachmentKey>.zip``).
         """
         try:
             children = self.zot.children(item_key)
@@ -221,10 +222,62 @@ class ZoteroLibrary:
                 data.get("filename") or ""
             ).lower().endswith(".pdf"):
                 continue
+            akey = ch.get("key")
+            # 1. Zotero storage (file synced to zotero.org)
             try:
-                return self.zot.file(ch.get("key"))
+                blob = self.zot.file(akey)
+                if blob and blob.startswith(b"%PDF"):
+                    return blob
+            except Exception:
+                pass
+            # 2. WebDAV file sync
+            blob = self._webdav_pdf(akey, data.get("filename"))
+            if blob:
+                return blob
+        return None
+
+    def _webdav_pdf(self, att_key: str | None, filename: str | None) -> bytes | None:
+        """Download an attachment from a Zotero WebDAV store. Zotero saves each
+        attachment as ``<url>/<attachmentKey>.zip`` (some setups nest it under a
+        ``zotero/`` dir); the zip contains the file. Returns PDF bytes or None."""
+        if not att_key:
+            return None
+        from . import config
+        dav = config.webdav_creds()
+        if not dav:
+            return None
+        import base64
+        import io
+        import urllib.request
+        import zipfile
+
+        headers = {"User-Agent": "claude-librarian/0.1"}
+        if dav.user is not None:
+            tok = base64.b64encode(f"{dav.user}:{dav.password or ''}".encode()).decode()
+            headers["Authorization"] = "Basic " + tok
+
+        for base in (dav.url, dav.url + "/zotero"):
+            try:
+                req = urllib.request.Request(f"{base}/{att_key}.zip", headers=headers)
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    blob = r.read()
             except Exception:
                 continue
+            if blob.startswith(b"%PDF"):  # server returned the raw file, not a zip
+                return blob
+            try:
+                zf = zipfile.ZipFile(io.BytesIO(blob))
+            except zipfile.BadZipFile:
+                continue
+            names = zf.namelist()
+            pick = filename if (filename and filename in names) else None
+            if not pick:
+                pdfs = [n for n in names if n.lower().endswith(".pdf")]
+                pick = pdfs[0] if pdfs else (names[0] if names else None)
+            if pick:
+                data = zf.read(pick)
+                if data.startswith(b"%PDF"):
+                    return data
         return None
 
     def add_record(self, record: dict[str, Any], collection_key: str | None = None,

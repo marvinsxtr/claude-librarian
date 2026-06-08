@@ -69,6 +69,9 @@ def cmd_setup(argv: list[str]) -> int:
     ap.add_argument("--zotero-api-key", dest="zkey", default=None)
     ap.add_argument("--zotero-library-type", dest="ztype", default=None, choices=["user", "group"])
     ap.add_argument("--s2-api-key", dest="s2", default=None)
+    ap.add_argument("--webdav-url", dest="dav_url", default=None, help="Zotero WebDAV file-sync URL (fetch attachment fallback)")
+    ap.add_argument("--webdav-user", dest="dav_user", default=None, help="Zotero WebDAV username")
+    ap.add_argument("--webdav-password", dest="dav_pass", default=None, help="Zotero WebDAV password")
     ap.add_argument("--scholar-link", dest="scholar", default=None, help="Scholar Inbox magic-link URL")
     ap.add_argument("--non-interactive", action="store_true", help="never prompt; use flags + defaults only")
     args = ap.parse_args(argv)
@@ -98,10 +101,17 @@ def cmd_setup(argv: list[str]) -> int:
     zkey = args.zkey or ask("Zotero API key", secret=True) or cfg.get("zotero_api_key")
     ztype = args.ztype or ask("Zotero library type (user/group)", default=cfg.get("zotero_library_type") or "user")
     s2 = args.s2 or ask("Semantic Scholar API key (optional, Enter to skip)", default=cfg.get("s2_api_key"))
+    dav_url = args.dav_url or ask("Zotero WebDAV URL (optional — enables the PDF attachment fallback)", default=cfg.get("zotero_webdav_url"))
+    dav_user = dav_pass = None
+    if dav_url:
+        dav_user = args.dav_user or ask("Zotero WebDAV username", default=cfg.get("zotero_webdav_user"))
+        dav_pass = args.dav_pass or ask("Zotero WebDAV password", secret=True) or cfg.get("zotero_webdav_password")
     scholar = args.scholar or ask("Scholar Inbox magic link — URL or sha (optional, Enter to skip)")
 
     for k, v in {"vault_path": vault, "zotero_library_id": zid, "zotero_api_key": zkey,
-                 "zotero_library_type": ztype, "s2_api_key": s2}.items():
+                 "zotero_library_type": ztype, "s2_api_key": s2,
+                 "zotero_webdav_url": dav_url, "zotero_webdav_user": dav_user,
+                 "zotero_webdav_password": dav_pass}.items():
         if v:
             cfg[k] = v
     config.save(cfg)
@@ -145,7 +155,10 @@ def cmd_config(argv: list[str]) -> int:
     ap.add_argument("--zotero-api-key", dest="zkey")
     ap.add_argument("--zotero-library-type", dest="ztype", choices=["user", "group"])
     ap.add_argument("--s2-api-key", dest="s2", help="optional Semantic Scholar key (lifts bibtex-updater rate limits)")
-    ap.add_argument("--show", action="store_true", help="print current config (api key masked)")
+    ap.add_argument("--webdav-url", dest="dav_url", help="Zotero WebDAV file-sync URL (enables the fetch attachment fallback)")
+    ap.add_argument("--webdav-user", dest="dav_user", help="Zotero WebDAV username")
+    ap.add_argument("--webdav-password", dest="dav_pass", help="Zotero WebDAV password")
+    ap.add_argument("--show", action="store_true", help="print current config (secrets masked)")
     args = ap.parse_args(argv)
 
     cfg = config.load()
@@ -155,6 +168,9 @@ def cmd_config(argv: list[str]) -> int:
         "zotero_api_key": args.zkey,
         "zotero_library_type": args.ztype,
         "s2_api_key": args.s2,
+        "zotero_webdav_url": args.dav_url,
+        "zotero_webdav_user": args.dav_user,
+        "zotero_webdav_password": args.dav_pass,
     }
     changed = False
     for k, v in updates.items():
@@ -171,6 +187,8 @@ def cmd_config(argv: list[str]) -> int:
             masked["zotero_api_key"] = masked["zotero_api_key"][:4] + "…(set)"
         if masked.get("s2_api_key"):
             masked["s2_api_key"] = "…(set)"
+        if masked.get("zotero_webdav_password"):
+            masked["zotero_webdav_password"] = "…(set)"
         if masked.get("scholar_sha_key"):
             masked["scholar_sha_key"] = masked["scholar_sha_key"][:6] + "…(set)"
         print(json.dumps(masked or {"(empty)": "run `lib config --help`"}, indent=2))
