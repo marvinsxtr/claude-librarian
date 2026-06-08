@@ -34,6 +34,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 TEMPLATES = PACKAGE_ROOT / "templates"
 AGENTS_SRC = PACKAGE_ROOT / "agents"
 SKILLS_SRC = PACKAGE_ROOT / "skills"
+WORKFLOWS_SRC = PACKAGE_ROOT / "workflows"
 DOT_OBSIDIAN_TEMPLATE = TEMPLATES / "dot-obsidian"
 
 WIKI_DIRS = ["papers", "findings", "authors", "fields", "threads", "views", ".sources"]
@@ -136,9 +137,10 @@ def main(argv: list[str]) -> int:
     # Schema lives at the vault root so Claude Code auto-loads it.
     results.append(("CLAUDE.md", seed(TEMPLATES / "CLAUDE.md", vault / "CLAUDE.md")))
 
-    # Install Claude Code agents + skills into the vault's .claude/.
+    # Install Claude Code agents + skills + workflows into the vault's .claude/.
     ag_created, ag_skipped = install_tree(AGENTS_SRC, vault / ".claude" / "agents")
     sk_created, sk_skipped = install_tree(SKILLS_SRC, vault / ".claude" / "skills")
+    wf_created, wf_skipped = install_tree(WORKFLOWS_SRC, vault / ".claude" / "workflows")
 
     (wiki / "log.md").open("a", encoding="utf-8").write(f"{now_stamp()} | init | {wiki} | seeded\n")
 
@@ -160,6 +162,7 @@ def main(argv: list[str]) -> int:
 
     print(f"\nClaude Code agents: {ag_created} installed, {ag_skipped} skipped (.claude/agents/)")
     print(f"Claude Code skills: {sk_created} installed, {sk_skipped} skipped (.claude/skills/)")
+    print(f"Claude Code workflows: {wf_created} installed, {wf_skipped} skipped (.claude/workflows/)")
 
     if ensure_gitignore(vault):
         print("Added research/.sources/ to .gitignore (cache is not committed).")

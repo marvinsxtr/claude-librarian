@@ -28,6 +28,11 @@ Two families of subcommands:
     log             append a line to log.md
     paths           print the resolved vault + wiki paths
 
+  Multi-paper ingest workflow glue (Step 2W — drain the queue):
+    ingest-apply    Phase B: payloads -> pages + findings + stubs + zotero + log
+    link-prep       Phase C: per-paper citation-match + finding candidates -> linker input
+    link-apply      Phase C: apply finding-linker edges + cites (serial)
+
 Run `lib <command> -h` for command-specific help.
 """
 
@@ -505,6 +510,14 @@ def _engine(name: str) -> Callable[[list[str]], int]:
     return run
 
 
+def _driver(func: str) -> Callable[[list[str]], int]:
+    """Lazily dispatch to a named function in ingest_drivers (Step 2W glue)."""
+    def run(argv: list[str]) -> int:
+        from . import ingest_drivers
+        return getattr(ingest_drivers, func)(argv)
+    return run
+
+
 COMMANDS: dict[str, Callable[[list[str]], int]] = {
     # sourcing & hygiene
     "setup": cmd_setup,
@@ -529,6 +542,10 @@ COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "create-stubs": _engine("create_stubs"),
     "lint": _engine("lint"),
     "log": _engine("log"),
+    # multi-paper ingest workflow glue (Step 2W)
+    "ingest-apply": _driver("ingest_apply"),
+    "link-prep": _driver("link_prep"),
+    "link-apply": _driver("link_apply"),
 }
 
 

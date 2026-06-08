@@ -51,46 +51,64 @@ lib paths        # -> {"vault": "...", "wiki": ".../research"}
 If the work list is empty, tell the user the queue is empty and stop. (Optionally
 suggest `lib pull` to fetch the latest Scholar Inbox digest first.)
 
-## Step 2W — drain the queue via a workflow (default for multi-paper drains)
+## Step 2W — drain the queue via the ingestion workflows (default for multi-paper drains)
 
-Call the **Workflow** tool. The skill instructing this *is* the opt-in. Four
-phases; the key safety rule is **all vault writes are serial** (Phase B), so
-concurrent papers never race on `index.md` / `log.md` / stub files.
+Two workflows installed at `.claude/workflows/` run the parallel LLM phases;
+three `lib` commands do the serial deterministic writes. **Invoking the Workflow
+tool here is the opt-in.** Key safety rule: **all vault/Zotero writes are serial**
+(`ingest-apply`, `link-apply`), so concurrent papers never race on `index.md` /
+`log.md` / stub files. Scratch dirs:
 
-**Phase A — extract (parallel; one pipeline item per inbox paper).** Each
-paper, in its own agent:
-1. `lib fetch "$WIKI" "<fetch_ref>"`. If `already_exists` is true, return
-   `{status:"exists", slug}` (Phase B will just mark it ingested). Otherwise
-   read the `brief` / `findings` / `meta` text slices it returns.
-2. Return one **schema-validated payload, with no vault writes**: the 4 summary
-   sections; the atomic findings (statement / source-ref / finding-type /
-   hedging / quote); and metadata (title, authors, publication-date, venue,
-   fields, quality{credibility, rigor, reproducibility, rationale}). Prefer the
-   **Zotero venue** from the Inbox record over the PDF's "Preprint" when `clean`
-   upgraded the item.
+```bash
+PAY=/tmp/lib_ingest/payloads LIN=/tmp/lib_ingest/linker_in LOUT=/tmp/lib_ingest/linker_out
+mkdir -p "$PAY" "$LIN" "$LOUT"
+lib scan fields "$WIKI"     # -> existing_fields (controlled vocabulary for Phase A)
+```
 
-   The specialized agents (`lite-drafter` / `finding-extractor` /
-   `metadata-extractor`) may be invoked via `agentType`, or collapsed into one
-   per-paper agent that plays all three roles — either is fine for triage grade.
+**Phase A — extract (parallel).** Run the `paper-ingest-extract` workflow, passing
+the Inbox work list + vocabulary as `args` (a JSON object, not a string):
 
-**Phase B — assemble (serial, deterministic).** After the workflow returns all
-payloads, drive the `lib` engine for each paper **one at a time** (a single
-driver loop): `assemble-paper` → `assemble-finding` → write finding slugs back
-into the paper frontmatter (`assemble-paper` with `overwrite`) → `create-stubs`
-→ `zotero-update --mark-ingested` → `log`. Serial writes keep shared vault files
-consistent.
+    Workflow(name: "paper-ingest-extract", args: {
+      items: <the `lib inbox --json` records>,
+      existing_fields: <slugs from `lib scan fields`>,
+      wiki: "<$WIKI>", style: "<vault>/CLAUDE.md", out: "<$PAY>" })
 
-**Phase C — link (after every page exists).** With the whole graph present, each
-paper can link to all others (better than sequential, where paper N only sees
-1..N-1). Per paper: `citation-match` + `scan findings-candidates`, then a
-`finding-linker` agent → `lib apply-edges`. Linker agents may run in parallel;
-`apply-edges` must run serially.
+Each agent fetches (with `--zotero-key` fallback), summarizes, extracts findings,
+and writes one payload JSON to `$PAY` — no wiki writes. Report any `status:"error"`
+papers (unfetchable even via the Zotero attachment).
 
-**Phase D — lint once.** `lib lint "$WIKI"` over the whole wiki.
+**Phase B — assemble (serial, deterministic).**
 
-Report per paper (slug, `quality.overall`, finding count, edge counts) plus a
-one-line queue summary. The per-paper semantics are exactly Steps 2–7 below —
-the workflow just parallelizes Phase A and defers linking to the end.
+```bash
+lib ingest-apply "$PAY"     # each payload -> page + findings + stubs + zotero + log
+```
+Papers whose slug already exists (duplicate Inbox items) surface as errors — mark
+those Zotero keys ingested + `duplicate` and leave them for `lib dedupe`.
+
+**Phase C — link (after every page exists, so each paper links to all others).**
+
+```bash
+lib link-prep "$WIKI" "$LIN"   # per paper: citation-match + finding candidates -> $LIN/<slug>.json
+```
+Run the `paper-ingest-link` workflow over those inputs (one pair per file in
+`$LIN`, excluding `_papers_scan.json`):
+
+    Workflow(name: "paper-ingest-link", args: {
+      pairs: [[<slug>, "<$LIN>/<slug>.json"], ...], out: "<$LOUT>" })
+
+```bash
+lib link-apply "$LIN" "$LOUT"  # writes cites + finding edges (apply-edges drops invalid targets)
+```
+
+**Phase D — lint once.**
+
+```bash
+lib lint "$WIKI"
+```
+
+Report per phase (extracted / errors, pages written, edges + cites applied) plus a
+one-line queue summary. Per-paper semantics match Steps 2–7 below; the workflows
+parallelize the LLM phases and the `lib` commands keep every write serial.
 
 ## Step 2 — per paper: fetch + extract (inline / single-ref mode)
 
