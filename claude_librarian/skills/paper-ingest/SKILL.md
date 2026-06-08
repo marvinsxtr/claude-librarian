@@ -12,8 +12,18 @@ the Zotero `Inbox` queue.
 **Division of labor.** All deterministic work is done by the `lib` CLI
 (sourcing, Zotero writes, PDF parsing, vault writes, linking, logging). The LLM
 is used only for four semantic subagents per paper: `lite-drafter`,
-`finding-extractor`, `metadata-extractor`, `finding-linker`. **Never loop an
-agent over a list** — if you catch yourself doing that, shell out to a script.
+`finding-extractor`, `metadata-extractor`, `finding-linker`.
+
+**Execution mode.**
+- **Single ref** (`$ARGUMENTS` given → one paper): run the inline per-paper
+  pipeline (Steps 2–7) once.
+- **Queue drain** (no argument → N papers): **default to a multi-agent
+  workflow** (Step 2W). Draining a long queue inline is impractical — it costs
+  ~15 `lib` calls + 3 subagents per paper and floods this conversation's
+  context. The workflow runs the per-paper LLM work in parallel, keeps all vault
+  writes serial, and links the whole graph at the end. **Never hand-loop
+  subagents over the list in the main conversation** — that's what the workflow
+  is for.
 
 ## Step 0 — greet + resolve paths
 
@@ -41,9 +51,52 @@ lib paths        # -> {"vault": "...", "wiki": ".../research"}
 If the work list is empty, tell the user the queue is empty and stop. (Optionally
 suggest `lib pull` to fetch the latest Scholar Inbox digest first.)
 
-## Step 2 — per paper: fetch + extract
+## Step 2W — drain the queue via a workflow (default for multi-paper drains)
 
-For each work item, run the pipeline below. Process papers one at a time.
+Call the **Workflow** tool. The skill instructing this *is* the opt-in. Four
+phases; the key safety rule is **all vault writes are serial** (Phase B), so
+concurrent papers never race on `index.md` / `log.md` / stub files.
+
+**Phase A — extract (parallel; one pipeline item per inbox paper).** Each
+paper, in its own agent:
+1. `lib fetch "$WIKI" "<fetch_ref>"`. If `already_exists` is true, return
+   `{status:"exists", slug}` (Phase B will just mark it ingested). Otherwise
+   read the `brief` / `findings` / `meta` text slices it returns.
+2. Return one **schema-validated payload, with no vault writes**: the 4 summary
+   sections; the atomic findings (statement / source-ref / finding-type /
+   hedging / quote); and metadata (title, authors, publication-date, venue,
+   fields, quality{credibility, rigor, reproducibility, rationale}). Prefer the
+   **Zotero venue** from the Inbox record over the PDF's "Preprint" when `clean`
+   upgraded the item.
+
+   The specialized agents (`lite-drafter` / `finding-extractor` /
+   `metadata-extractor`) may be invoked via `agentType`, or collapsed into one
+   per-paper agent that plays all three roles — either is fine for triage grade.
+
+**Phase B — assemble (serial, deterministic).** After the workflow returns all
+payloads, drive the `lib` engine for each paper **one at a time** (a single
+driver loop): `assemble-paper` → `assemble-finding` → write finding slugs back
+into the paper frontmatter (`assemble-paper` with `overwrite`) → `create-stubs`
+→ `zotero-update --mark-ingested` → `log`. Serial writes keep shared vault files
+consistent.
+
+**Phase C — link (after every page exists).** With the whole graph present, each
+paper can link to all others (better than sequential, where paper N only sees
+1..N-1). Per paper: `citation-match` + `scan findings-candidates`, then a
+`finding-linker` agent → `lib apply-edges`. Linker agents may run in parallel;
+`apply-edges` must run serially.
+
+**Phase D — lint once.** `lib lint "$WIKI"` over the whole wiki.
+
+Report per paper (slug, `quality.overall`, finding count, edge counts) plus a
+one-line queue summary. The per-paper semantics are exactly Steps 2–7 below —
+the workflow just parallelizes Phase A and defers linking to the end.
+
+## Step 2 — per paper: fetch + extract (inline / single-ref mode)
+
+For a single `$ARGUMENTS` ref, run the pipeline below once. (A queue drain uses
+Step 2W instead, which performs this same fetch → extract → assemble → link per
+paper.)
 
 ```bash
 lib fetch "$WIKI" "<fetch_ref>"
