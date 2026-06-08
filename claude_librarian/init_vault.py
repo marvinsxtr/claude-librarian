@@ -73,6 +73,26 @@ def install_tree(src_dir: Path, dst_dir: Path) -> tuple[int, int]:
     return created, skipped
 
 
+GITIGNORE_ENTRIES = [
+    "# claude-librarian: cached PDFs / extracted text slices (regenerated on demand)",
+    "research/.sources/",
+]
+
+
+def ensure_gitignore(vault: Path) -> bool:
+    """Make sure the vault's .gitignore excludes the .sources cache. Returns True
+    if it added the entry. The cache is derived data (transient PDFs + text
+    slices) and should never be committed."""
+    gi = vault / ".gitignore"
+    existing = gi.read_text(encoding="utf-8") if gi.exists() else ""
+    if "research/.sources/" in existing or ".sources/" in existing:
+        return False
+    block = ("\n" if existing and not existing.endswith("\n") else "") + "\n".join(GITIGNORE_ENTRIES) + "\n"
+    with gi.open("a", encoding="utf-8") as f:
+        f.write(block)
+    return True
+
+
 def seed_obsidian_config(vault: Path) -> tuple[int, int]:
     """Copy the bundled .obsidian/ template into the vault, never overwriting,
     then ensure 'dataview' is enabled in community-plugins.json."""
@@ -140,6 +160,9 @@ def main(argv: list[str]) -> int:
 
     print(f"\nClaude Code agents: {ag_created} installed, {ag_skipped} skipped (.claude/agents/)")
     print(f"Claude Code skills: {sk_created} installed, {sk_skipped} skipped (.claude/skills/)")
+
+    if ensure_gitignore(vault):
+        print("Added research/.sources/ to .gitignore (cache is not committed).")
 
     dv_created, dv_skipped = seed_obsidian_config(vault)
     print(f"Obsidian config: {dv_created} created, {dv_skipped} skipped (.obsidian/ — Dataview enabled)")

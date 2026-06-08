@@ -107,12 +107,14 @@ def cmd_setup(argv: list[str]) -> int:
 
     creds = config.zotero_creds(require=False)
     if creds:
-        from .zotero import ZoteroLibrary, INBOX_NAME
+        from .zotero import ZoteroLibrary, INBOX_NAME, WIKI_NAME
         try:
-            ZoteroLibrary(creds).ensure_collection(INBOX_NAME)
-            print(f"Ensured Zotero '{INBOX_NAME}' collection (the ingest queue).")
+            zlib = ZoteroLibrary(creds)
+            zlib.ensure_collection(INBOX_NAME)
+            zlib.ensure_collection(WIKI_NAME)
+            print(f"Ensured Zotero '{INBOX_NAME}' (ingest queue) and '{WIKI_NAME}' (ingested papers) collections.")
         except Exception as e:
-            print(f"Could not create the Zotero '{INBOX_NAME}' collection: {e}")
+            print(f"Could not create the Zotero '{INBOX_NAME}'/'{WIKI_NAME}' collections: {e}")
 
     if scholar:
         from .sources import scholar_inbox
@@ -443,12 +445,14 @@ def cmd_zotero_update(argv: list[str]) -> int:
     """Deterministic Zotero-side step of an ingest: tag, move out of Inbox, mark
     wiki-ingested — in one call, so the skill never loops an LLM over items."""
     from . import config
-    from .zotero import ZoteroLibrary, INBOX_NAME, INGESTED_TAG
+    from .zotero import ZoteroLibrary, INBOX_NAME, INGESTED_TAG, WIKI_NAME
     ap = argparse.ArgumentParser(prog="lib zotero-update")
     ap.add_argument("--key", required=True, help="Zotero item key")
     ap.add_argument("--add-tags", default="", help="comma-separated coarse/functional tags")
     ap.add_argument("--mark-ingested", action="store_true", help="add the wiki-ingested tag")
     ap.add_argument("--keep-in-inbox", action="store_true", help="do not remove from Inbox")
+    ap.add_argument("--no-wiki-collection", action="store_true",
+                    help=f"do not add the item to the '{WIKI_NAME}' collection")
     args = ap.parse_args(argv)
 
     lib = ZoteroLibrary(config.zotero_creds())
@@ -462,6 +466,12 @@ def cmd_zotero_update(argv: list[str]) -> int:
         lib.set_tags(item, *tags)
         actions.append(f"tagged {tags}")
         item = lib.get_item(args.key)  # refresh version after the patch
+
+    if not args.no_wiki_collection:
+        wiki_key = lib.ensure_collection(WIKI_NAME)
+        lib.zot.addto_collection(wiki_key, item)
+        actions.append(f"added to {WIKI_NAME}")
+        item = lib.get_item(args.key)
 
     if not args.keep_in_inbox:
         inbox = lib.find_collection(INBOX_NAME)

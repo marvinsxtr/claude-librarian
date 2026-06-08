@@ -95,6 +95,7 @@ def main(argv: list[str]) -> int:
     cites = payload.get("cites") or []
 
     edge_counts: dict[str, int] = {t: 0 for t in EDGE_TYPES}
+    dropped_targets = 0  # edges whose target finding does not exist (e.g. a linker hallucinated/truncated slug)
     touched: set[Path] = set()
 
     paper_edges: dict[str, set[str]] = {
@@ -122,6 +123,12 @@ def main(argv: list[str]) -> int:
                     continue
                 tgt_slug = unwrap_wikilink(target)
                 if tgt_slug == nf_slug:
+                    continue
+                # Targets must be real wiki findings. The linker is told to copy
+                # candidate slugs verbatim, but can hallucinate/truncate them;
+                # writing those would create dangling wikilinks. Drop instead.
+                if not finding_path(vault, tgt_slug).exists():
+                    dropped_targets += 1
                     continue
 
                 if add_to_list(nf_fm, ["relations", edge_type], tgt_slug):
@@ -178,7 +185,8 @@ def main(argv: list[str]) -> int:
             write_frontmatter(tp_path, fm, body)
             touched.add(tp_path)
 
-    print(json.dumps({"edge_counts": edge_counts, "touched_files": len(touched)}, indent=2))
+    print(json.dumps({"edge_counts": edge_counts, "dropped_targets": dropped_targets,
+                      "touched_files": len(touched)}, indent=2))
     return 0
 
 

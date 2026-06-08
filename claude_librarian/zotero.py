@@ -19,6 +19,7 @@ from .config import ZoteroCreds
 
 INGESTED_TAG = "wiki-ingested"
 INBOX_NAME = "Inbox"
+WIKI_NAME = "Wiki"  # collection that holds every ingested paper (created at setup)
 
 _ARXIV_RE = re.compile(r"(\d{4}\.\d{4,5})(v\d+)?", re.IGNORECASE)
 _DOI_RE = re.compile(r"\b(10\.\d{4,}/[^\s,;)\"]+)", re.IGNORECASE)
@@ -201,6 +202,30 @@ class ZoteroLibrary:
 
     def get_item(self, key: str) -> dict[str, Any]:
         return self.zot.item(key)
+
+    def attachment_pdf_bytes(self, item_key: str) -> bytes | None:
+        """Return the bytes of the item's first PDF attachment, or None.
+
+        Used as a fetch fallback when the web source is unreachable (e.g. a
+        Cloudflare-gated bioRxiv DOI) but the user has the PDF saved in Zotero.
+        """
+        try:
+            children = self.zot.children(item_key)
+        except Exception:
+            return None
+        for ch in children:
+            data = ch.get("data", {})
+            if data.get("itemType") != "attachment":
+                continue
+            if data.get("contentType") != "application/pdf" and not str(
+                data.get("filename") or ""
+            ).lower().endswith(".pdf"):
+                continue
+            try:
+                return self.zot.file(ch.get("key"))
+            except Exception:
+                continue
+        return None
 
     def add_record(self, record: dict[str, Any], collection_key: str | None = None,
                    tags: list[str] | None = None) -> dict[str, Any]:

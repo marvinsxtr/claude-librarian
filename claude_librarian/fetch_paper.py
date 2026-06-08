@@ -77,13 +77,18 @@ def arxiv_pdf_url(aid: str) -> str:
     return f"https://arxiv.org/pdf/{base}.pdf"
 
 
+class DownloadError(Exception):
+    """Raised when a remote fetch fails, so callers can fall back (e.g. to a
+    Zotero attachment) instead of aborting."""
+
+
 def download(url: str, dest: Path) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "claude-librarian/0.1"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r, dest.open("wb") as f:
             shutil.copyfileobj(r, f)
-    except urllib.error.URLError as e:
-        die(f"download failed for {url}: {e}")
+    except (urllib.error.URLError, OSError) as e:
+        raise DownloadError(f"download failed for {url}: {e}") from e
 
 
 def extract_full_text(pdf_path: Path) -> tuple[str, int]:
@@ -293,11 +298,28 @@ def find_existing_paper(
     return None
 
 
+def _zotero_attachment_bytes(zotero_key: str) -> Optional[bytes]:
+    """Best-effort: the bytes of the Zotero item's PDF attachment, or None.
+    Silent on any failure (missing creds, no attachment) — this is a fallback."""
+    try:
+        from . import config
+        from .zotero import ZoteroLibrary
+        creds = config.zotero_creds(require=False)
+        if not creds:
+            return None
+        return ZoteroLibrary(creds).attachment_pdf_bytes(zotero_key)
+    except Exception:
+        return None
+
+
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="lib fetch", description=__doc__.strip().splitlines()[0])
     ap.add_argument("vault", help="the wiki directory (e.g. <vault>/research)")
     ap.add_argument("input", help="arxiv id / DOI / URL / local PDF path")
     ap.add_argument("--force", action="store_true", help="re-extract even if cached")
+    ap.add_argument("--zotero-key", default=None,
+                    help="fallback: if the web source is unreachable, fetch the PDF "
+                         "from this Zotero item's attachment")
     args = ap.parse_args(argv)
 
     vault = require_vault(args.vault)
@@ -319,38 +341,53 @@ def main(argv: list[str]) -> int:
         return 0
 
     sha = sha256_of(src_url)
-    raw_path = sources / f"{sha}.pdf"
+    raw_path = sources / f"{sha}.pdf"     # transient: deleted after text extraction
     txt_path = sources / f"{sha}.txt"
     brief_path = sources / f"{sha}.brief.txt"
     findings_path = sources / f"{sha}.findings.txt"
     meta_path = sources / f"{sha}.meta.txt"
+    text_slices = (txt_path, brief_path, findings_path, meta_path)
 
-    skipped_cached = False
-    if (raw_path.exists() and txt_path.exists() and brief_path.exists()
-            and findings_path.exists() and meta_path.exists() and not args.force):
-        skipped_cached = True
-    else:
-        if src_type == "pdf":
-            shutil.copy2(Path(src_url), raw_path)
-        elif src_type == "arxiv":
-            download(arxiv_pdf_url(arxiv_id or ""), raw_path)
-        else:
-            download(src_url, raw_path)
+    # The cached *text* slices are the source of truth; the raw PDF/HTML is
+    # transient (we delete it after extraction) so it is not part of the check.
+    skipped_cached = all(p.exists() for p in text_slices) and not args.force
 
     page_count = 0
+    fetch_method = "cached"
     if not skipped_cached:
-        head = raw_path.read_bytes()[:5]
-        if head.startswith(b"%PDF"):
+        got_pdf = False
+        # 1. primary source (local file / arXiv / generic URL)
+        try:
+            if src_type == "pdf":
+                shutil.copy2(Path(src_url), raw_path)
+            elif src_type == "arxiv":
+                download(arxiv_pdf_url(arxiv_id or ""), raw_path)
+            else:
+                download(src_url, raw_path)
+            got_pdf = raw_path.exists() and raw_path.read_bytes()[:5].startswith(b"%PDF")
+            fetch_method = "web" if got_pdf else fetch_method
+        except DownloadError:
+            got_pdf = False
+
+        # 2. fallback: pull the PDF from the item's Zotero attachment. Covers
+        #    Cloudflare/Incapsula-gated sources (e.g. bioRxiv) the user has saved.
+        if not got_pdf and args.zotero_key:
+            data = _zotero_attachment_bytes(args.zotero_key)
+            if data and data[:5].startswith(b"%PDF"):
+                raw_path.write_bytes(data)
+                got_pdf = True
+                fetch_method = "zotero-attachment"
+
+        # 3. extract text slices, then drop the raw download
+        if got_pdf:
             full, page_count = extract_full_text(raw_path)
             txt_path.write_text(full, encoding="utf-8")  # full text stays raw — citation_match needs it
             brief_path.write_text(compact(extract_brief(raw_path)), encoding="utf-8")
             findings_path.write_text(compact(extract_findings_slice(raw_path)), encoding="utf-8")
             meta_path.write_text(compact(extract_meta_slice(raw_path)), encoding="utf-8")
-        else:
-            html_path = sources / f"{sha}.html"
-            raw_path.rename(html_path)
-            raw_path = html_path
-            text = html_path.read_text(encoding="utf-8", errors="replace")
+        elif raw_path.exists():
+            # non-PDF (HTML page) — strip tags into text slices
+            text = raw_path.read_text(encoding="utf-8", errors="replace")
             stripped = re.sub(r"<script.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
             stripped = re.sub(r"<style.*?</style>", "", stripped, flags=re.DOTALL | re.IGNORECASE)
             stripped = re.sub(r"<[^>]+>", " ", stripped)
@@ -360,6 +397,12 @@ def main(argv: list[str]) -> int:
             brief_path.write_text(compacted, encoding="utf-8")
             findings_path.write_text(compacted, encoding="utf-8")
             meta_path.write_text(compacted[:6000], encoding="utf-8")
+            fetch_method = "web-html"
+        else:
+            hint = " (try --zotero-key to use the saved attachment)" if not args.zotero_key else ""
+            die(f"could not fetch {src_url}{hint}")
+
+        raw_path.unlink(missing_ok=True)  # transient — never persisted in the vault
 
     out = {
         "source_type": src_type,
@@ -367,13 +410,13 @@ def main(argv: list[str]) -> int:
         "arxiv_id": arxiv_id,
         "doi": doi,
         "sha": sha,
-        "raw_path": str(raw_path),
         "full_text_path": str(txt_path),
         "brief_text_path": str(brief_path),
         "findings_text_path": str(findings_path),
         "meta_text_path": str(meta_path),
         "page_count": page_count,
         "skipped_cached": skipped_cached,
+        "fetch_method": fetch_method,
     }
     print(json.dumps(out, indent=2))
     return 0
