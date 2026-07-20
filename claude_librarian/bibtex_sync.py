@@ -5,7 +5,7 @@ key and write it into the page's ``citekey`` frontmatter, then (re)generate
 ``<wiki>/references.bib`` from all those entries. Idempotent: run it standalone to
 backfill, or at the end of ``/paper-ingest`` to fold in newly ingested papers.
 
-Built-in translator keys (``purucker_beyond_2026``), not Better BibTeX.
+Built-in translator keys, not Better BibTeX.
 """
 
 from __future__ import annotations
