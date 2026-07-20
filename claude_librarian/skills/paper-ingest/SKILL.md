@@ -100,9 +100,10 @@ Run the `paper-ingest-link` workflow over those inputs (one pair per file in
 lib link-apply "$LIN" "$LOUT"  # writes cites + finding edges (apply-edges drops invalid targets)
 ```
 
-**Phase D — lint once.**
+**Phase D — sync citations + lint once.**
 
 ```bash
+lib bibtex-sync "$WIKI"   # backfill new papers' citekeys from Zotero + refresh references.bib
 lib lint "$WIKI"
 ```
 
@@ -221,10 +222,11 @@ This tags the item, moves it out of `Inbox`, and marks it `wiki-ingested`.
 - If this paper meaningfully bears on an open question or connects papers, create
   or update a page in `research/threads/` (see the schema's Threads section) and
   link it to the relevant papers/findings.
-- Log + lint:
+- Log, sync citations, lint:
 
 ```bash
 lib log "$WIKI" ingest "<slug>" "<n> findings, <e> edges"
+lib bibtex-sync "$WIKI"   # set this paper's citekey from Zotero + refresh references.bib
 lib lint "$WIKI" --new-slugs "<finding-slug-1>,<finding-slug-2>,..."
 ```
 

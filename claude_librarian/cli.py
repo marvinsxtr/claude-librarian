@@ -15,6 +15,7 @@ Two families of subcommands:
     dedupe          report duplicate items in the Zotero library
     zotero-update   tag + move-out-of-inbox + mark a Zotero item ingested
     bibtex          export BibTeX from Zotero (by keys/slugs/collection/all)
+    bibtex-sync     backfill wiki citekeys from Zotero + (re)write references.bib
 
   Wiki engine (deterministic vault writes — used by the skills):
     init            scaffold the wiki + install skills/agents into a vault
@@ -531,45 +532,6 @@ def _keys_from_slugs(slugs: list[str], vault: str | None) -> tuple[list[str], li
     return keys, missing
 
 
-def _zotero_bibtex(creds, *, item_keys: list[str] | None = None,
-                   collection_key: str | None = None) -> str:
-    """BibTeX for the selected items via the Zotero Web API. Uses Zotero's
-    built-in translator (not Better BibTeX). When item_keys is None, exports every
-    top-level item in the library (or collection). Paginates on Total-Results."""
-    import urllib.parse
-    import urllib.request
-
-    base = f"https://api.zotero.org/{creds.library_type}s/{creds.library_id}"
-    headers = {"Zotero-API-Key": creds.api_key, "Zotero-API-Version": "3"}
-
-    def _get(path: str, params: dict) -> tuple[str, Any]:
-        url = f"{base}{path}?{urllib.parse.urlencode(params)}"
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=60) as r:
-            return r.read().decode("utf-8"), r.headers
-
-    parts: list[str] = []
-    if item_keys is not None:
-        keys = list(dict.fromkeys(item_keys))  # dedupe, preserve order
-        for i in range(0, len(keys), 50):  # itemKey filter — batch in chunks
-            body, _ = _get("/items", {"itemKey": ",".join(keys[i:i + 50]),
-                                      "format": "bibtex", "limit": 100})
-            if body.strip():
-                parts.append(body.strip())
-    else:
-        path = f"/collections/{collection_key}/items/top" if collection_key else "/items/top"
-        start = 0
-        while True:
-            body, hdrs = _get(path, {"format": "bibtex", "limit": 100, "start": start})
-            if body.strip():
-                parts.append(body.strip())
-            total = int(hdrs.get("Total-Results", 0))
-            start += 100
-            if start >= total:
-                break
-    return ("\n\n".join(p for p in parts if p) + "\n") if parts else ""
-
-
 def cmd_bibtex(argv: list[str]) -> int:
     """Export BibTeX from Zotero for chosen items, a collection, or the whole library."""
     from . import config
@@ -588,6 +550,7 @@ def cmd_bibtex(argv: list[str]) -> int:
     ap.add_argument("--vault", default=None, help="vault path override (for --slugs)")
     args = ap.parse_args(argv)
 
+    from . import bibtex as _bibtex
     creds = config.zotero_creds()
     item_keys: list[str] | None = None
     collection_key: str | None = None
@@ -607,7 +570,7 @@ def cmd_bibtex(argv: list[str]) -> int:
             return 1
     # else: --all → item_keys and collection_key both None → whole library
 
-    bib = _zotero_bibtex(creds, item_keys=item_keys, collection_key=collection_key)
+    bib = _bibtex.zotero_bibtex(creds, item_keys=item_keys, collection_key=collection_key)
     n = sum(1 for ln in bib.splitlines() if ln.lstrip().startswith("@"))
     if args.output:
         from pathlib import Path
@@ -661,6 +624,7 @@ COMMANDS: dict[str, Callable[[list[str]], int]] = {
     "dedupe": cmd_dedupe,
     "zotero-update": cmd_zotero_update,
     "bibtex": cmd_bibtex,
+    "bibtex-sync": _engine("bibtex_sync"),
     "paths": cmd_paths,
     # wiki engine
     "init": _engine("init_vault"),
